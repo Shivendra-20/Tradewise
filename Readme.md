@@ -43,7 +43,7 @@ Response to user
 **AI Output**: "Risk Score: 7/10. Your portfolio is heavily concentrated in Banking (60%). Consider diversifying into IT or Pharma. Nifty Bank has shown high correlation with RBI policy changes."
 
 ## 👨‍💻 Author
-[Your Name] - NIT Jalandhar, IT Department
+Shivendra Pawaiya - NIT Jalandhar, IT Department
 
 
 **Indian Stock Portfolio Tracker with AI Insights** | MERN + Google Gemini
