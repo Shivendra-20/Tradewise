@@ -1,25 +1,65 @@
 import mongoose from "mongoose";
 
-const transactionSchema = new mongoose.Schema({
+const transactionSchema = new mongoose.Schema(
+{
     userId:{
         type:mongoose.Schema.Types.ObjectId,
         ref:"User",
+        required:true
     },
-     symbol:String,
 
-    type:{
+    stockId:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"Stock",
+        required:true
+    },
+
+    orderId:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"Order",
+        required:true
+    },
+
+    action:{
         type:String,
-        enum:["BUY","SELL"]
+        enum:["buy","sell"],
+        required:true
     },
 
-    quantity:Number,
+    quantity:{
+        type:Number,
+        required:true,
+        min:1
+    },
 
-    price:Number
+    price:{
+        type:Number,
+        required:true,
+        min:0
+    },
+
+    total: {
+      type: Number,
+      min: 0,
+    },
 },
 {
     timestamps:true
+}
+);
+
+transactionSchema.pre("save", function () {
+  this.total = this.quantity * this.price;
 });
 
-const TransactionSchema = mongoose.model("Transaction",transactionSchema);
+transactionSchema.index({
+    userId:1,
+    createdAt:-1
+});
 
-export default TransactionSchema;
+const Transaction = mongoose.model(
+    "Transaction",
+    transactionSchema
+);
+
+export default Transaction;

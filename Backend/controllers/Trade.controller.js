@@ -1,145 +1,268 @@
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import Portfolio from "../models/Portfolio.js";
 import Transaction from "../models/Transaction.js";
+import Order from "../models/Order.js";
+import Stock from "../models/Stock.js";
 
 export const buyStock = async (req, res) => {
-    try {
-        
-        //Todo 
-        // 1. Don't take price from req.body
-        // 2.Use mongodb session for trancsaction
-        // 3.Add limit orders(user kis price pr buy krna chahta h): PENDING EXECUTED CANCELLED 
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-        const { symbol, quantity, price } = req.body;
+  try {
+    const { stockId, quantity } = req.body;
 
-        // Input Validation
-        if (!symbol || !quantity || !price) {
-            return res.status(400).json({
-                message: "All fields are required"
-            });
-        }
-
-        if (quantity <= 0 || price <= 0) {
-            return res.status(400).json({
-                message: "Quantity and price must be greater than 0"
-            });
-        }
-
-        if (!Number.isInteger(quantity)) {
-            return res.status(400).json({
-                message: "Quantity must be an integer"
-            });
-        }
-
-        const totalCost = quantity * price;
-
-        // Find User
-        const user = await User.findById(req.user._id);
-
-        if (!user) {
-            return res.status(404).json({
-                message: "User not found"
-            });
-        }
-
-        // Check Balance
-        if (user.balance < totalCost) {
-            return res.status(400).json({
-                message: "Insufficient Balance"
-            });
-        }
-
-        // Deduct Balance
-        user.balance -= totalCost;
-        await user.save();
-
-        // Check Existing Holding
-        let holding = await Portfolio.findOne({
-            userId: user._id,
-            symbol
-        });
-
-        if (holding) {
-
-            const totalShares = holding.quantity + quantity;
-
-            holding.averagePrice =((holding.averagePrice * holding.quantity) + (price * quantity)) / totalShares;
-
-            holding.quantity = totalShares;
-
-            await holding.save();
-
-        } else {
-
-            holding = await Portfolio.create({
-                userId: user._id,
-                symbol,
-                quantity,
-                averagePrice: price
-            });
-
-        }
-
-        // Create Transaction Record
-        await Transaction.create({
-            userId: user._id,
-            symbol,
-            type: "BUY",
-            quantity,
-            price
-        });
-
-        return res.status(201).json({
-            message: "Stock Purchased Successfully",
-            balance: user.balance,
-            holding
-        });
-
-    } catch (error) {
-
-        console.error("Buy Stock Error:", error);
-
-        return res.status(500).json({
-            message: "Internal Server Error"
-        });
+    if (!stockId || !quantity) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Stock ID and quantity are required",
+      });
     }
+
+    if (!mongoose.Types.ObjectId.isValid(stockId)) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Invalid stock ID",
+      });
+    }
+
+    const qty = Number(quantity);
+
+    if (!Number.isInteger(qty) || qty <= 0) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Quantity must be a positive integer",
+      });
+    }
+
+    const stock = await Stock.findOne({ _id: stockId, isActive: true }).session(session);
+
+    if (!stock) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: "Stock not found",
+      });
+    }
+
+    const price = stock.currentPrice;
+    const totalCost = qty * price;
+
+    const user = await User.findById(req.user._id).session(session);
+
+    if (!user) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (user.virtualBalance < totalCost) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient balance",
+      });
+    }
+
+    user.virtualBalance -= totalCost;
+    await user.save({ session });
+
+    const order = new Order({
+      userId: user._id,
+      stockId,
+      type: "buy",
+      orderType: "market",
+      status: "completed",
+      quantity: qty,
+      price,
+      executedAt: new Date(),
+    });
+    await order.save({ session });
+
+    let holding = await Portfolio.findOne({
+      userId: user._id,
+      stockId,
+    }).session(session);
+
+    if (holding) {
+      const totalShares = holding.quantity + qty;
+
+      holding.avgBuyPrice =
+        (holding.avgBuyPrice * holding.quantity + price * qty) / totalShares;
+      holding.quantity = totalShares;
+
+      await holding.save({ session });
+    } else {
+      holding = new Portfolio({
+        userId: user._id,
+        stockId,
+        quantity: qty,
+        avgBuyPrice: price,
+      });
+      await holding.save({ session });
+    }
+
+    const transaction = new Transaction({
+      userId: user._id,
+      stockId,
+      orderId: order._id,
+      action: "buy",
+      quantity: qty,
+      price,
+    });
+    await transaction.save({ session });
+
+    await session.commitTransaction();
+
+    const populatedHolding = await Portfolio.findById(holding._id).select(
+      "quantity avgBuyPrice totalInvested stockId"
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: `${stock.name} purchased successfully`,
+      remainingBalance: user.virtualBalance,
+      orderId: order._id,
+      holding: populatedHolding,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Buy Stock Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  } finally {
+    session.endSession();
+  }
 };
 
-export const sellStock = async (req,res) => {
-    try {
-            const {symbol,quantity,price} = req.body;
-            const user  = await User.findById(req.user._id);
+export const sellStock = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-            const holding = await Portfolio.findOne({userId:user._id,symbol});
+  try {
+    const { stockId, quantity } = req.body;
 
-           if(!holding || holding.quantity < quantity){
-                return res.status(400).json({message:"Not enough shares"});
-        }
+    if (!stockId || !quantity) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Stock ID and quantity are required",
+      });
+    }
 
-        holding.quantity -= quantity;
+    if (!mongoose.Types.ObjectId.isValid(stockId)) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Invalid stock ID",
+      });
+    }
 
-        if(holding.quantity === 0){
-            await holding.deleteOne();
-        }
-        else{
-            await holding.save();
-        }
+    const qty = Number(quantity);
 
-        user.balance += quantity*price;
-        await user.save();
-        
-        await Transaction.create({
-            userId:user._id,
-            symbol,
-            type:"SELL",
-            quantity,
-            price
-        });
+    if (!Number.isInteger(qty) || qty <= 0) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Quantity must be a positive integer",
+      });
+    }
 
-        res.json({message:"Stock Sold"});
-}
-catch(error){
-    res.status(500).json({message:error.message });
-}
+    const stock = await Stock.findOne({ _id: stockId, isActive: true }).session(session);
 
-}
+    if (!stock) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: "Stock not found",
+      });
+    }
+
+    const price = stock.currentPrice;
+
+    const user = await User.findById(req.user._id).session(session);
+
+    if (!user) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const holding = await Portfolio.findOne({
+      userId: user._id,
+      stockId,
+    }).session(session);
+
+    if (!holding || holding.quantity < qty) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Not enough shares",
+      });
+    }
+
+    const remainingShares = holding.quantity - qty;
+
+    if (remainingShares === 0) {
+      await holding.deleteOne({ session });
+    } else {
+      holding.quantity = remainingShares;
+      await holding.save({ session });
+    }
+
+    user.virtualBalance += qty * price;
+    await user.save({ session });
+
+    const order = new Order({
+      userId: user._id,
+      stockId,
+      type: "sell",
+      orderType: "market",
+      status: "completed",
+      quantity: qty,
+      price,
+      executedAt: new Date(),
+    });
+    await order.save({ session });
+
+    const transaction = new Transaction({
+      userId: user._id,
+      stockId,
+      orderId: order._id,
+      action: "sell",
+      quantity: qty,
+      price,
+    });
+    await transaction.save({ session });
+
+    await session.commitTransaction();
+
+    return res.status(200).json({
+      success: true,
+      message: `${stock.name} sold successfully`,
+      updatedBalance: user.virtualBalance,
+      remainingShares,
+      orderId: order._id,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Sell Stock Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  } finally {
+    session.endSession();
+  }
+};

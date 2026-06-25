@@ -66,3 +66,40 @@ Shivendra Pawaiya - NIT Jalandhar, IT Department
 * Developed interactive dashboards featuring profit/loss calculations, portfolio allocation insights, performance tracking, and real-time stock visualizations.
 * Integrated an AI-powered financial assistant using Gemini API to provide portfolio insights, explain market concepts, summarize financial news, and answer user investment queries.
 * Connected external market data services and optimized frontend state management to deliver a responsive user experience across trading and analytics workflows.
+
+
+
+
+
+
+What you CAN realistically build 🎯
+Feature                                          Doable with MERN?
+Virtual paper trading                           ✅ Yes
+Live prices (with free API)                     ✅ Yes
+Real-time price updates (WebSocket)             ✅ Yes
+Portfolio P&L tracking                          ✅ Yes
+Basic charts (Recharts/TradingView widget)      ✅ Yes
+Leaderboard (who made most profit)              ✅ Yes
+Multiple order types (market, limit)            ✅ Simulated
+Real money   & demat                            ❌ No
+SEBI compliance & KYC                           ❌ No
+Microsecond order matching                      ❌ No
+
+
+
+
+ER Diagram;
+file:///C:/Users/shive/Downloads/virtual_trading_platform_erd.html
+
+Features
+file:///C:/Users/shive/Downloads/virtual_trading_feature_roadmap.html
+
+Live prices (Finnhub free API + Socket.io) — this single feature makes your app feel real
+Buy/sell orders + transaction history — core trading loop
+Portfolio P&L dashboard — users need to see if they're winning or losing
+Candlestick charts — TradingView has a free embeddable widget, zero backend work
+Leaderboard — makes it fun and shareable
+Watchlist — already in your DB schema, easy to build
+Limit orders — first "advanced" feature worth adding
+
+file:///C:/Users/shive/Downloads/trading_platform_features.html
