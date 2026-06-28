@@ -3,12 +3,13 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
-import HealthCheckRoute from "./routes/HealthCheck.js";
-import PortfolioRoutes from "./routes/portfolio.routes.js";
-import TradeRoutes from "./routes/trade.routes.js";
-import TransactionRoutes from "./routes/transaction.routes.js";
-import StockRoutes from "./routes/stock.routes.js";
-import WatchlistRoute from "./routes/watchlist.routes.js";
+import healthCheckRoute from "./routes/HealthCheck.js";
+import portfolioRoutes from "./routes/portfolio.routes.js";
+import tradeRoutes from "./routes/trade.routes.js";
+import transactionRoutes from "./routes/transaction.routes.js";
+import stockRoutes from "./routes/stock.routes.js";
+import watchlistRoute from "./routes/watchlist.routes.js";
+import orderRoutes from "./routes/order.routes.js";
 import "dotenv/config";
 
 const PORT = process.env.PORT || 5000;
@@ -25,16 +26,26 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.get("/", (req, res) => {
-  res.send("TradeWise API Running");
+  res.json({ success: true, message: "TradeWise API Running" });
 });
 
+// Auth & health
 app.use("/api/auth", authRoutes);
-app.use("/Health", HealthCheckRoute);
-app.use("/portfolio", PortfolioRoutes);
-app.use("/trade", TradeRoutes);
-app.use("/transaction", TransactionRoutes);
-app.use("/api/stocks", StockRoutes);
-app.use("/api/watchlist", WatchlistRoute);
+app.use("/api/health", healthCheckRoute);
+app.use("/Health", healthCheckRoute);
+
+// Trading & portfolio
+app.use("/api/orders", orderRoutes);
+app.use("/api/trade", tradeRoutes);
+app.use("/api/portfolio", portfolioRoutes);
+app.use("/api/transaction", transactionRoutes);
+app.use("/trade", tradeRoutes);
+app.use("/portfolio", portfolioRoutes);
+app.use("/transaction", transactionRoutes);
+
+// Stocks & watchlist
+app.use("/api/stocks", stockRoutes);
+app.use("/api/watchlist", watchlistRoute);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found" });

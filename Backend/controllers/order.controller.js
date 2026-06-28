@@ -1,181 +1,195 @@
 import mongoose from "mongoose";
-import Order       from "../models/Order.js";
-import Stock       from "../models/Stock.js";
-import Portfolio   from "../models/Portfolio.js";
+import Order from "../models/Order.js";
+import Stock from "../models/Stock.js";
+import Portfolio from "../models/Portfolio.js";
 import Transaction from "../models/Transaction.js";
-import User        from "../models/User.js";
+import User from "../models/User.js";
 
-// ─── Place Order (Buy or Sell) ───────────────────────────────
-// POST /api/orders
-// This is the most important function — it touches 4 models atomically
+const getUserId = (req) => req.user._id;
+
+const abortAndRespond = async (session, res, status, message) => {
+  await session.abortTransaction();
+  return res.status(status).json({ success: false, message });
+};
+
 export const placeOrder = async (req, res) => {
-  // Use a MongoDB session so if anything fails, everything rolls back
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { stockId, type, orderType = "market", quantity, price } = req.body;
-    const userId = req.user.id;
+    const userId = getUserId(req);
+    const qty = Number(quantity);
 
-    // ── 1. Validate input ──────────────────────────────────────
     if (!stockId || !type || !quantity) {
-      return res.status(400).json({
-        success: false,
-        message: "stockId, type, and quantity are required",
+      return abortAndRespond(session, res, 400, "stockId, type, and quantity are required");
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(stockId)) {
+      return abortAndRespond(session, res, 400, "Invalid stock ID");
+    }
+
+    if (!["buy", "sell"].includes(type)) {
+      return abortAndRespond(session, res, 400, "type must be buy or sell");
+    }
+
+    if (!Number.isInteger(qty) || qty <= 0) {
+      return abortAndRespond(session, res, 400, "quantity must be a positive integer");
+    }
+
+    if (!["market", "limit"].includes(orderType)) {
+      return abortAndRespond(session, res, 400, "orderType must be market or limit");
+    }
+
+    const stock = await Stock.findOne({ _id: stockId, isActive: true }).session(session);
+
+    if (!stock) {
+      return abortAndRespond(session, res, 404, "Stock not found");
+    }
+
+    // Limit orders: store as pending — execution happens when price matches (future cron/job)
+    if (orderType === "limit") {
+      if (!price || price <= 0) {
+        return abortAndRespond(session, res, 400, "price is required for limit orders");
+      }
+
+      const order = new Order({
+        userId,
+        stockId,
+        type,
+        orderType: "limit",
+        status: "pending",
+        quantity: qty,
+        price,
+      });
+      await order.save({ session });
+
+      await session.commitTransaction();
+
+      return res.status(201).json({
+        success: true,
+        message: "Limit order placed successfully",
+        data: { order },
       });
     }
-    if (!["buy", "sell"].includes(type)) {
-      return res.status(400).json({ success: false, message: "type must be buy or sell" });
-    }
-    if (quantity < 1 || !Number.isInteger(Number(quantity))) {
-      return res.status(400).json({ success: false, message: "quantity must be a positive integer" });
-    }
 
-    // ── 2. Fetch stock ─────────────────────────────────────────
-    const stock = await Stock.findById(stockId).session(session);
-    if (!stock || !stock.isActive) {
-      await session.abortTransaction();
-      return res.status(404).json({ success: false, message: "Stock not found" });
-    }
+    const executionPrice = stock.currentPrice;
+    const totalCost = parseFloat((qty * executionPrice).toFixed(2));
 
-    // For market orders, always use currentPrice
-    // For limit orders, use the price the user set
-    const executionPrice = orderType === "market" ? stock.currentPrice : price;
-
-    if (!executionPrice || executionPrice <= 0) {
-      await session.abortTransaction();
-      return res.status(400).json({ success: false, message: "Invalid price" });
-    }
-
-    const totalCost = parseFloat((quantity * executionPrice).toFixed(2));
-
-    // ── 3. Fetch user ──────────────────────────────────────────
     const user = await User.findById(userId).session(session);
+
     if (!user) {
-      await session.abortTransaction();
-      return res.status(404).json({ success: false, message: "User not found" });
+      return abortAndRespond(session, res, 404, "User not found");
     }
 
     const balanceBefore = user.virtualBalance;
-    let   balanceAfter  = balanceBefore;
-    let   profitLoss    = null;
+    let balanceAfter = balanceBefore;
+    let profitLoss = null;
 
-    // ── 4. Handle BUY ──────────────────────────────────────────
     if (type === "buy") {
       if (user.virtualBalance < totalCost) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient balance. Required: ₹${totalCost}, Available: ₹${user.virtualBalance}`,
-        });
+        return abortAndRespond(
+          session,
+          res,
+          400,
+          `Insufficient balance. Required: ₹${totalCost}, Available: ₹${user.virtualBalance}`
+        );
       }
 
-      // Deduct balance
       user.virtualBalance = parseFloat((user.virtualBalance - totalCost).toFixed(2));
       balanceAfter = user.virtualBalance;
-      await user.save({ session, validateBeforeSave: false });
+      await user.save({ session });
 
-      // Update portfolio (create if first time buying, update avgBuyPrice if already holding)
       const existing = await Portfolio.findOne({ userId, stockId }).session(session);
 
       if (existing) {
-        // Recalculate average buy price
-        // Formula: ((oldQty * oldAvg) + (newQty * newPrice)) / (oldQty + newQty)
         const newAvg = parseFloat(
-          ((existing.quantity * existing.avgBuyPrice + quantity * executionPrice) /
-            (existing.quantity + quantity)).toFixed(2)
+          (
+            (existing.quantity * existing.avgBuyPrice + qty * executionPrice) /
+            (existing.quantity + qty)
+          ).toFixed(2)
         );
-        existing.quantity    += Number(quantity);
-        existing.avgBuyPrice  = newAvg;
+        existing.quantity += qty;
+        existing.avgBuyPrice = newAvg;
         await existing.save({ session });
       } else {
-        await Portfolio.create(
-          [{ userId, stockId, quantity: Number(quantity), avgBuyPrice: executionPrice }],
-          { session }
-        );
+        const holding = new Portfolio({
+          userId,
+          stockId,
+          quantity: qty,
+          avgBuyPrice: executionPrice,
+        });
+        await holding.save({ session });
       }
     }
 
-    // ── 5. Handle SELL ─────────────────────────────────────────
     if (type === "sell") {
       const holding = await Portfolio.findOne({ userId, stockId }).session(session);
 
-      if (!holding || holding.quantity < quantity) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          message: `Not enough shares. You hold ${holding?.quantity || 0}, trying to sell ${quantity}`,
-        });
+      if (!holding || holding.quantity < qty) {
+        return abortAndRespond(
+          session,
+          res,
+          400,
+          `Not enough shares. You hold ${holding?.quantity || 0}, trying to sell ${qty}`
+        );
       }
 
-      // Calculate profit/loss for this sell
-      profitLoss = parseFloat(
-        ((executionPrice - holding.avgBuyPrice) * quantity).toFixed(2)
-      );
+      profitLoss = parseFloat(((executionPrice - holding.avgBuyPrice) * qty).toFixed(2));
 
-      // Add money back to balance
       user.virtualBalance = parseFloat((user.virtualBalance + totalCost).toFixed(2));
       balanceAfter = user.virtualBalance;
-      await user.save({ session, validateBeforeSave: false });
+      await user.save({ session });
 
-      // Reduce portfolio quantity
-      holding.quantity -= Number(quantity);
+      holding.quantity -= qty;
 
       if (holding.quantity === 0) {
-        // User sold all shares — remove from portfolio
-        await Portfolio.findByIdAndDelete(holding._id, { session });
+        await holding.deleteOne({ session });
       } else {
         await holding.save({ session });
       }
     }
 
-    // ── 6. Create Order record ─────────────────────────────────
-    const [order] = await Order.create(
-      [{
-        userId,
-        stockId,
-        type,
-        orderType,
-        status:      "completed",
-        quantity:    Number(quantity),
-        price:       executionPrice,
-        executedAt:  new Date(),
-      }],
-      { session }
-    );
+    const order = new Order({
+      userId,
+      stockId,
+      type,
+      orderType: "market",
+      status: "completed",
+      quantity: qty,
+      price: executionPrice,
+      executedAt: new Date(),
+    });
+    await order.save({ session });
 
-    // ── 7. Create Transaction record ───────────────────────────
-    await Transaction.create(
-      [{
-        userId,
-        stockId,
-        orderId:     order._id,
-        action:      type,
-        quantity:    Number(quantity),
-        price:       executionPrice,
-        balanceBefore,
-        balanceAfter,
-        profitLoss,
-        stockSymbol: stock.symbol,
-      }],
-      { session }
-    );
+    const transaction = new Transaction({
+      userId,
+      stockId,
+      orderId: order._id,
+      action: type,
+      quantity: qty,
+      price: executionPrice,
+      stockSymbol: stock.symbol,
+      balanceBefore,
+      balanceAfter,
+      profitLoss,
+    });
+    await transaction.save({ session });
 
-    // ── 8. Commit everything ───────────────────────────────────
     await session.commitTransaction();
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: `${type.toUpperCase()} order placed successfully`,
+      message: `${type.toUpperCase()} order executed successfully`,
       data: {
         order: {
-          _id:        order._id,
-          type:       order.type,
-          orderType:  order.orderType,
-          quantity:   order.quantity,
-          price:      order.price,
+          _id: order._id,
+          type: order.type,
+          orderType: order.orderType,
+          quantity: order.quantity,
+          price: order.price,
           totalValue: order.totalValue,
-          status:     order.status,
+          status: order.status,
         },
         balanceBefore,
         balanceAfter,
@@ -185,35 +199,29 @@ export const placeOrder = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     console.error("[placeOrder]", error);
-    res.status(500).json({ success: false, message: "Order failed. Please try again." });
+    return res.status(500).json({ success: false, message: "Order failed. Please try again." });
   } finally {
     session.endSession();
   }
 };
 
-// ─── Get user's orders ───────────────────────────────────────
-// GET /api/orders?page=1&limit=10&type=buy&status=completed
 export const getMyOrders = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const page   = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit  = Math.min(50, parseInt(req.query.limit) || 10);
-    const skip   = (page - 1) * limit;
+    const userId = getUserId(req);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, parseInt(req.query.limit) || 10);
+    const skip = (page - 1) * limit;
 
     const filter = { userId };
-    if (req.query.type)   filter.type   = req.query.type;
+    if (req.query.type) filter.type = req.query.type;
     if (req.query.status) filter.status = req.query.status;
 
     const [orders, total] = await Promise.all([
-      Order.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Order.countDocuments(filter),
     ]);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: orders,
       pagination: {
@@ -225,37 +233,41 @@ export const getMyOrders = async (req, res) => {
     });
   } catch (error) {
     console.error("[getMyOrders]", error);
-    res.status(500).json({ success: false, message: "Failed to fetch orders" });
+    return res.status(500).json({ success: false, message: "Failed to fetch orders" });
   }
 };
 
-// ─── Get single order ─────────────────────────────────────────
-// GET /api/orders/:id
 export const getOrderById = async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid order ID" });
+    }
+
     const order = await Order.findOne({
-      _id:    req.params.id,
-      userId: req.user.id,   // ensure user owns this order
+      _id: req.params.id,
+      userId: getUserId(req),
     });
 
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    res.status(200).json({ success: true, data: order });
+    return res.status(200).json({ success: true, data: order });
   } catch (error) {
     console.error("[getOrderById]", error);
-    res.status(500).json({ success: false, message: "Failed to fetch order" });
+    return res.status(500).json({ success: false, message: "Failed to fetch order" });
   }
 };
 
-// ─── Cancel pending order ────────────────────────────────────
-// PATCH /api/orders/:id/cancel
 export const cancelOrder = async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid order ID" });
+    }
+
     const order = await Order.findOne({
-      _id:    req.params.id,
-      userId: req.user.id,
+      _id: req.params.id,
+      userId: getUserId(req),
     });
 
     if (!order) {
@@ -272,13 +284,13 @@ export const cancelOrder = async (req, res) => {
     order.status = "cancelled";
     await order.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Order cancelled",
       data: order,
     });
   } catch (error) {
     console.error("[cancelOrder]", error);
-    res.status(500).json({ success: false, message: "Failed to cancel order" });
+    return res.status(500).json({ success: false, message: "Failed to cancel order" });
   }
 };
