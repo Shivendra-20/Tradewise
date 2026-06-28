@@ -1,11 +1,6 @@
 import Router from "express";
 import { protectRoute } from "../middlewares/auth.middleware.js";
-import {
-  addToWatchlist,
-  getWatchlist,
-  removeFromWatchlist,
-  updateWatchlistNote,
-} from "../controllers/Watchlist.controller.js";
+import { addToWatchlist, getWatchlist, removeFromWatchlist, updateWatchlistNote } from "../controllers/Watchlist.controller.js";
 
 const router = Router();
 

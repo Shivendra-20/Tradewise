@@ -12,6 +12,6 @@ const router = Router();
 router.post("/", protectRoute, placeOrder);
 router.get("/", protectRoute, getMyOrders);
 router.get("/:id", protectRoute, getOrderById);
-router.patch("/:id/cancel", protectRoute, cancelOrder);
+router.patch("/cancel/:id", protectRoute, cancelOrder);
 
 export default router;

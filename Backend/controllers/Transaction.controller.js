@@ -6,16 +6,14 @@ export const getTransactions = async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const filter = { userId: req.user._id };
-
     const [transactions, total] = await Promise.all([
-      Transaction.find(filter)
+      Transaction.find( { userId: req.user._id })
         .populate("stockId", "symbol name currentPrice sector")
         .populate("orderId", "type orderType status executedAt")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
-      Transaction.countDocuments(filter),
+      Transaction.countDocuments( { userId: req.user._id }),
     ]);
 
     return res.status(200).json({

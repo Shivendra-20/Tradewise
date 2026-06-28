@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 
 export const addToWatchlist = async (req, res) => {
   try {
-    const { stockId, note } = req.body;
+    const { stockId, note } = req.body;  // 1. Get stockId and note
 
     if (!stockId) {
       return res.status(400).json({ success: false, message: "stockId is required." });
@@ -14,33 +14,29 @@ export const addToWatchlist = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid stockId format." });
     }
 
-    const stockExists = await Stock.findOne({ _id: stockId, isActive: true });
+    const stockExists = await Stock.exists({ _id: stockId, isActive: true });
     if (!stockExists) {
       return res.status(404).json({ success: false, message: "Stock not found." });
     }
 
-    const userId = req.user._id;
-
-    const existing = await Watchlist.findOne({ userId, stockId });
-    if (existing) {
-      return res.status(409).json({ success: false, message: "Stock is already in your watchlist." });
+    if(note && note.length > 300){
+      return res.status(400).json({success:false,message:"Note must be 300 characters or fewer."});
     }
+
+    const userId = req.user._id;
 
     const item = await Watchlist.create({
       userId,
       stockId,
-      ...(note && { note }),
+      ...(note?.trim() && { note:note.trim() }),
     });
 
-    const populatedItem = await Watchlist.findById(item._id).populate(
-      "stockId",
-      "symbol name currentPrice changePercent sector"
-    );
+    await item.populate("stockId","symbol name currentPrice changePercent sector");
 
     return res.status(201).json({
       success: true,
       message: "Stock added to watchlist successfully.",
-      watchListItem: populatedItem,
+      watchListItem: item,
     });
   } catch (error) {
     console.error("addToWatchlist Error:", error);
@@ -61,10 +57,7 @@ export const removeFromWatchlist = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid stockId format." });
     }
 
-    const deleted = await Watchlist.findOneAndDelete({
-      userId: req.user._id,
-      stockId,
-    });
+    const deleted = await Watchlist.findOneAndDelete({userId: req.user._id,stockId,});
 
     if (!deleted) {
       return res.status(404).json({ success: false, message: "Stock not found in your watchlist." });
@@ -113,8 +106,10 @@ export const updateWatchlistNote = async (req, res) => {
 export const getWatchlist = async (req, res) => {
   try {
     const items = await Watchlist.find({ userId: req.user._id })
+      .select("stockId note createdAt")  //  skip userId, _id auto-included
       .populate("stockId", "symbol name currentPrice changePercent sector")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,

@@ -103,3 +103,19 @@ Watchlist — already in your DB schema, easy to build
 Limit orders — first "advanced" feature worth adding
 
 file:///C:/Users/shive/Downloads/trading_platform_features.html
+
+High priority
+Limit order execution engine — cron/job that checks pending limit orders against stock.currentPrice and executes when price matches
+Live stock price updates — WebSocket or scheduled job to refresh currentPrice, change, dayHigh, etc. (your Stock model is ready for this)
+Password reset flow — fields exist on User (resetPasswordToken) but no routes/controllers yet
+Medium priority
+Admin routes — stock CRUD, user management (role: "admin" exists but no admin middleware)
+Input validation layer — express-validator or Zod on all routes
+Rate limiting — protect auth and trade endpoints from abuse
+Tests — unit/integration tests for trade flow
+Nice to have
+Realized P&L dashboard endpoint — aggregate sell profitLoss from transactions
+Stock price history — chart data (new model + API)
+Notifications — order filled, limit triggered
+API documentation — Swagger/OpenAPI
+Docker + deployment config

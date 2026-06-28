@@ -5,7 +5,6 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import healthCheckRoute from "./routes/HealthCheck.js";
 import portfolioRoutes from "./routes/portfolio.routes.js";
-import tradeRoutes from "./routes/trade.routes.js";
 import transactionRoutes from "./routes/transaction.routes.js";
 import stockRoutes from "./routes/stock.routes.js";
 import watchlistRoute from "./routes/watchlist.routes.js";
@@ -22,6 +21,7 @@ app.use(
     credentials: true,
   })
 );
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -31,21 +31,16 @@ app.get("/", (req, res) => {
 
 // Auth & health
 app.use("/api/auth", authRoutes);
-app.use("/api/health", healthCheckRoute);
 app.use("/Health", healthCheckRoute);
 
 // Trading & portfolio
-app.use("/api/orders", orderRoutes);
-app.use("/api/trade", tradeRoutes);
-app.use("/api/portfolio", portfolioRoutes);
-app.use("/api/transaction", transactionRoutes);
-app.use("/trade", tradeRoutes);
+app.use("/orders", orderRoutes);
 app.use("/portfolio", portfolioRoutes);
 app.use("/transaction", transactionRoutes);
 
 // Stocks & watchlist
-app.use("/api/stocks", stockRoutes);
-app.use("/api/watchlist", watchlistRoute);
+app.use("/stocks", stockRoutes);
+app.use("/watchlist", watchlistRoute);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
