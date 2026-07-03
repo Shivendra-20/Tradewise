@@ -42,14 +42,14 @@ TradeWise is a full-stack **MERN** paper trading platform that allows users to p
 ```text
 TradeWise/
 │
-├── client/                 # React Frontend
-├── server/                 # Express Backend
+├── Frontend/                 # React Frontend
+├── Backend/                 # Express Backend
 │   ├── config/
 │   ├── controllers/
 │   ├── middleware/
 │   ├── models/
 │   ├── routes/
-│   └── utils/
+│   └── seed/
 │
 └── README.md
 ```
@@ -66,7 +66,7 @@ cd TradeWise
 ### Backend Setup
 
 ```bash
-cd server
+cd Backend
 npm install
 ```
 
@@ -87,7 +87,7 @@ npm run dev
 ### Frontend Setup
 
 ```bash
-cd client
+cd Frontend
 npm install
 npm run dev
 ```
@@ -119,7 +119,7 @@ npm run dev
 **Shivendra Pawaiya**
 
 * GitHub: https://github.com/Shivendra-20
-* LinkedIn: https://www.linkedin.com/in/shivendra-pawaiya/
+* LinkedIn: [https://www.linkedin.com/in/shivendra-pawaiya/](https://www.linkedin.com/in/shivendra-pawaiya-879708323/)
 
 ## ⭐ Support
 
