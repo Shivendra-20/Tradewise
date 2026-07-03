@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+.ticker-track {
+  animation: ticker 22s linear infinite;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes ticker {
+  from {
+    transform: translateX(0%);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
