@@ -1,12 +1,24 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import AuthLayout from "../components/auth/AuthLayout";
-import Input from "../components/auth/Input";
-import { loginUser } from "../services/authService";
+import AuthLayout from "../components/auth/Authlayout.jsx";
+import Input from "../components/auth/Input.jsx";
+import { loginUser } from "../api/auth.js";
 import toast from "react-hot-toast";
+import { useDispatch } from "react-redux";
+import { login } from "../redux/authSlice.js";
+import { useSelector } from "react-redux";
+
 
 export default function Login() {
+
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const token = useSelector((state) => state.auth.token);
+
+    if (token) {
+       return <Navigate to="/dashboard" replace />;
+    }
 
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +32,7 @@ export default function Login() {
              ...prev,
             [e.target.name]: e.target.value,
          }));
-      };
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,16 +46,17 @@ export default function Login() {
 
       const res = await loginUser(form);
 
-     localStorage.setItem("token", res.data.token);
-
-    localStorage.setItem(
-         "user",
-         JSON.stringify({
-              _id: res.data._id,
-              name: res.data.name,
-              email: res.data.email,
-              balance: res.data.balance,
-         })
+    dispatch(
+      login({
+        token:res.data.token,
+        
+        user:{
+            _id:res.data._id,
+            name:res.data.name,
+            email:res.data.email,
+            balance:res.data.balance
+          }
+      })
     );
 
       toast.success("Login Successful");

@@ -1,14 +1,23 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import AuthLayout from "../components/auth/AuthLayout";
-import Input from "../components/auth/Input";
-import { loginUser } from "../services/authService";
+import AuthLayout from "../components/auth/Authlayout.jsx";
+import Input from "../components/auth/Input.jsx";
+import { registerUser  } from "../api/auth.js";
 import toast from "react-hot-toast";
+import { useDispatch, useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
+import { login } from "../redux/authSlice.js";
 
 export default function Register() {
   const navigate = useNavigate();
-
+  const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
+
+  const token = useSelector((state) => state.auth.token);
+
+    if (token) {
+       return <Navigate to="/dashboard" replace />;
+    }
 
  const [form, setForm] = useState({
     name:"",
@@ -26,7 +35,7 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.email || !form.password) {
+if (!form.name || !form.email || !form.password) {
       return toast.error("Please fill all fields");
     }
 
@@ -35,24 +44,25 @@ export default function Register() {
 
       const res = await registerUser(form);
 
-   localStorage.setItem("token", res.data.token);
-
-localStorage.setItem(
-    "user",
-    JSON.stringify({
-        _id: res.data._id,
-        name: res.data.name,
-        email: res.data.email,
-        balance: res.data.balance,
-    })
+  dispatch(
+  login({
+    token: res.data.token,
+    user: {
+      _id: res.data._id,
+      name: res.data.name,
+      email: res.data.email,
+      balance: res.data.balance,
+    },
+  })
 );
 
       toast.success("Registration Successful");
 
       navigate("/dashboard");
     } catch (err) {
+      console.log(err);
       toast.error(
-        err.response?.data?.message || "Login Failed"
+        err.response?.data?.message || "Register Failed"
       );
     } finally {
       setLoading(false);
@@ -70,7 +80,7 @@ localStorage.setItem(
         </h1>
 
         <p className="text-gray-400 mb-8">
-          Login to continue trading.
+         Start your paper trading journey today.
         </p>
 
         <div className="space-y-5">
@@ -106,17 +116,15 @@ localStorage.setItem(
             disabled={loading}
             className="w-full bg-green-500 hover:bg-green-400 py-3 rounded-xl font-semibold transition"
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "Creating Account..." : "Create Account"}
           </button>
 
           <p className="text-center text-gray-400">
-            Don't have an account?{" "}
-            <Link
-              to="/register"
-              className="text-green-400"
-            >
-              Register
-            </Link>
+           Already have an account?
+
+          <Link to="/login">
+               Login
+          </Link>
           </p>
 
         </div>
