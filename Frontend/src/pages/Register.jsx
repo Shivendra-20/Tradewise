@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate,Navigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import toast from "react-hot-toast";
 import AuthLayout from "../components/auth/Authlayout.jsx";
 import Input from "../components/auth/Input.jsx";
 import { registerUser  } from "../api/auth.js";
-import toast from "react-hot-toast";
-import { useDispatch, useSelector } from "react-redux";
-import { Navigate } from "react-router-dom";
 import { login } from "../redux/authSlice.js";
 
-export default function Register() {
+export default Register = () => {
+
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
@@ -35,32 +35,32 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-if (!form.name || !form.email || !form.password) {
+  if (!form.name || !form.email || !form.password) {
       return toast.error("Please fill all fields");
     }
 
-    try {
+  try {
+      
       setLoading(true);
-
       const res = await registerUser(form);
 
-  dispatch(
-  login({
-    token: res.data.token,
-    user: {
-      _id: res.data._id,
-      name: res.data.name,
-      email: res.data.email,
-      balance: res.data.balance,
-    },
-  })
-);
+      dispatch(
+      login({
+        token: res.data.token,
+        user: {
+        _id: res.data._id,
+        name: res.data.name,
+        email: res.data.email,
+        balance: res.data.balance,
+      },
+    })
+  );
 
       toast.success("Registration Successful");
-
       navigate("/dashboard");
+
     } catch (err) {
-      console.log(err);
+      console.log("Error in Registration",err);
       toast.error(
         err.response?.data?.message || "Register Failed"
       );
