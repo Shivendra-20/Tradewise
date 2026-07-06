@@ -21,3 +21,26 @@
 html {
   scroll-behavior: smooth;
 }
+
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-background: #09090B;
+  --color-surface: #18181B;
+  --color-surface-hover: #1F1F23;
+
+  --color-border: #27272A;
+
+  --color-primary: #22C55E;
+  --color-danger: #EF4444;
+
+  --color-text: #FAFAFA;
+  --color-muted: #A1A1AA;
+
+  /* Radius */
+  --radius-card: 1.5rem;
+
+  /* Shadow */
+  --shadow-card: 0 0 40px rgba(34,197,94,0.08);
+}

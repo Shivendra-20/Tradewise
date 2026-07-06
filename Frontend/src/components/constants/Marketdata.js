@@ -1,0 +1,47 @@
+export const marketIndices = [
+  {
+    id:1,
+    symbol:"NIFTY 50",
+    value:"25,461.30",
+    change:"+185.25",
+    percent:"+0.73%",
+    status:"Live",
+    positive:true
+  },
+  {
+    id: 2,
+    symbol: "SENSEX",
+    value: "83,425.15",
+    change: -92.45,
+    percent: -0.11,
+     status:"Live",
+    positive: false,
+  },
+  {
+    id: 3,
+    symbol: "BANKNIFTY",
+    value: "57,285.20",
+    change: 425.40,
+    percent: 0.74,
+     status:"Live",
+    positive: true,
+  },
+  {
+    id: 4,
+    symbol: "FINNIFTY",
+    value: "27,154.10",
+    change: 112.60,
+    percent: 0.42,
+     status:"Live",
+    positive: true,
+  },
+  {
+    id: 5,
+    symbol: "MIDCAP",
+    value: "14,352.85",
+    change: -35.10,
+    percent: -0.24,
+     status:"Live", 
+    positive: false,
+  },
+];

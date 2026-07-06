@@ -7,7 +7,7 @@ import Input from "../components/auth/Input.jsx";
 import { registerUser  } from "../api/auth.js";
 import { login } from "../redux/authSlice.js";
 
-export default Register = () => {
+const Register = () => {
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -131,4 +131,6 @@ export default Register = () => {
       </form>
     </AuthLayout>
   );
-}
+};
+
+export default Register;
