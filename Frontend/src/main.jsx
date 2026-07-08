@@ -1,17 +1,21 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.jsx'
-import { BrowserRouter } from 'react-router-dom'
-import { Provider } from "react-redux"
-import { store } from './redux/store.js'
-import { Toaster } from 'react-hot-toast'
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import App from "./App.jsx";
+import { BrowserRouter } from "react-router-dom";
+import { Provider } from "react-redux";
+import { Toaster } from "react-hot-toast";
+import { store } from "./redux/store.js";
+import { ThemeProvider } from "./context/ThemeContext.jsx";
+import ScrollToTop from "./components/common/ScrollToTop.jsx";
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById("root")).render(
   <Provider store={store}>
-  <BrowserRouter>
-       <Toaster position="top-right" />
-    <App />
-  </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+      <ScrollToTop/>
+        <Toaster position="top-right" />
+        <App />
+      </BrowserRouter>
+    </ThemeProvider>
   </Provider>
-)
+);

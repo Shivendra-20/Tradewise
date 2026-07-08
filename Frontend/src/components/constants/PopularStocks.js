@@ -1,0 +1,58 @@
+export const popularStocks = [
+  {
+    symbol: "RELIANCE",
+    name: "Reliance Industries",
+    price: "₹1,586.40",
+    change: "+2.31%",
+    positive: true,
+  },
+  {
+    symbol: "TCS",
+    name: "Tata Consultancy",
+    price: "₹3,982.20",
+    change: "+1.84%",
+    positive: true,
+  },
+  {
+    symbol: "INFY",
+    name: "Infosys",
+    price: "₹1,742.50",
+    change: "-0.52%",
+    positive: false,
+  },
+  {
+    symbol: "HDFCBANK",
+    name: "HDFC Bank",
+    price: "₹1,923.60",
+    change: "+0.92%",
+    positive: true,
+  },
+  {
+    symbol: "ICICIBANK",
+    name: "ICICI Bank",
+    price: "₹1,488.10",
+    change: "+1.22%",
+    positive: true,
+  },
+  {
+    symbol: "SBIN",
+    name: "State Bank of India",
+    price: "₹845.75",
+    change: "-1.02%",
+    positive: false,
+  },
+  {
+    symbol: "TATAMOTORS",
+    name: "Tata Motors",
+    price: "₹692.30",
+    change: "+3.42%",
+    positive: true,
+  },
+  {
+    symbol: "BHARTIARTL",
+    name: "Bharti Airtel",
+    price: "₹1,905.80",
+    change: "+0.62%",
+    positive: true,
+  },
+];

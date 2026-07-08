@@ -1,29 +1,27 @@
 import { useState } from "react";
-import { Link, useNavigate,Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
+
 import AuthLayout from "../components/auth/Authlayout.jsx";
 import Input from "../components/auth/Input.jsx";
-import { registerUser  } from "../api/auth.js";
+import { registerUser } from "../api/auth.js";
 import { login } from "../redux/authSlice.js";
 
 const Register = () => {
-
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const [loading, setLoading] = useState(false);
-
   const token = useSelector((state) => state.auth.token);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+  });
 
-    if (token) {
-       return <Navigate to="/dashboard" replace />;
-    }
-
- const [form, setForm] = useState({
-    name:"",
-    email:"",
-    password:"",
-});
+  if (token) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleChange = (e) => {
     setForm((prev) => ({
@@ -35,35 +33,30 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-  if (!form.name || !form.email || !form.password) {
+    if (!form.name || !form.email || !form.password) {
       return toast.error("Please fill all fields");
     }
 
-  try {
-      
+    try {
       setLoading(true);
       const res = await registerUser(form);
 
       dispatch(
-      login({
-        token: res.data.token,
-        user: {
-        _id: res.data._id,
-        name: res.data.name,
-        email: res.data.email,
-        balance: res.data.balance,
-      },
-    })
-  );
+        login({
+          token: res.data.token,
+          user: {
+            _id: res.data._id,
+            name: res.data.name,
+            email: res.data.email,
+            balance: res.data.balance,
+          },
+        })
+      );
 
       toast.success("Registration Successful");
       navigate("/dashboard");
-
     } catch (err) {
-      console.log("Error in Registration",err);
-      toast.error(
-        err.response?.data?.message || "Register Failed"
-      );
+      toast.error(err.response?.data?.message || "Register Failed");
     } finally {
       setLoading(false);
     }
@@ -73,25 +66,19 @@ const Register = () => {
     <AuthLayout>
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md bg-neutral-950 border border-white/10 rounded-3xl p-8"
+        className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-950/80 p-8 shadow-[0_0_80px_rgba(34,197,94,0.12)]"
       >
-        <h1 className="text-4xl font-bold text-white mb-2">
-        Create Account
-        </h1>
-
-        <p className="text-gray-400 mb-8">
-         Start your paper trading journey today.
-        </p>
+        <h1 className="mb-2 text-4xl font-bold text-white">Create Account</h1>
+        <p className="mb-8 text-gray-400">Start your paper trading journey with a premium experience.</p>
 
         <div className="space-y-5">
-
           <Input
-          label="Full Name"
-          name="name"
-          type="text"
-          value={form.name}
-          onChange={handleChange}
-          placeholder="Enter your name"
+            label="Full Name"
+            name="name"
+            type="text"
+            value={form.name}
+            onChange={handleChange}
+            placeholder="Enter your name"
           />
 
           <Input
@@ -114,19 +101,17 @@ const Register = () => {
 
           <button
             disabled={loading}
-            className="w-full bg-green-500 hover:bg-green-400 py-3 rounded-xl font-semibold transition"
+            className="w-full rounded-xl bg-green-500 py-3 font-semibold text-black transition hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {loading ? "Creating Account..." : "Create Account"}
           </button>
 
           <p className="text-center text-gray-400">
-           Already have an account?
-
-          <Link to="/login">
-               Login
-          </Link>
+            Already have an account?{" "}
+            <Link to="/login" className="text-green-400">
+              Login
+            </Link>
           </p>
-
         </div>
       </form>
     </AuthLayout>
