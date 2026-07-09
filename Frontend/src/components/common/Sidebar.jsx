@@ -7,8 +7,11 @@ import {
   TrendingUp,
   Wallet,
   Eye,
+  ClipboardList,
+  ReceiptText,
+  LogOut,
 } from "lucide-react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink ,useNavigate} from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
 
 const navItems = [
@@ -32,10 +35,26 @@ const navItems = [
     path: "/watchlist",
     icon: Eye,
   },
+  {
+    title: "Orders",
+    path: "/orders",
+    icon: ClipboardList,
+  },
+  {
+    title: "Transactions",
+    path: "/transactions",
+    icon: ReceiptText,
+  },
 ];
 
 export default function Sidebar({ open, onClose }) {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+
+    const handleLogout = () => {
+    localStorage.removeItem("token");
+   navigate("/login");
+    };
 
   return (
     <>
@@ -117,23 +136,7 @@ export default function Sidebar({ open, onClose }) {
           <div className="my-8 h-px bg-(--border-color)" />
 
           {/* Market Pulse */}
-          <div className="rounded-3xl border border-blue-500/15 bg-gradient-to-br from-blue-500/10 via-sky-500/5 to-transparent p-5">
-            <div className="flex items-center gap-2">
-              <TrendingUp
-                size={18}
-                className="text-blue-400"
-              />
-
-              <span className="font-semibold text-blue-400">
-                Market Pulse
-              </span>
-            </div>
-
-            <p className="mt-3 text-sm leading-6 text-(--text-secondary)">
-              Keep track of market momentum, trends and live movements
-              throughout the trading session.
-            </p>
-          </div>
+        
 
           <div className="mt-5 rounded-2xl border border-(--border-color) bg-(--surface-1) p-4">
             <div className="flex items-center gap-3">
@@ -154,6 +157,15 @@ export default function Sidebar({ open, onClose }) {
             </div>
           </div>
 
+        <div className="mt-auto pt-6 border-t border-(--border-color)">
+  <button
+    onClick={handleLogout}
+    className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-red-400 transition hover:bg-red-500/10"
+  >
+    <LogOut size={18} />
+    Logout
+  </button>
+</div>
         </div>
       </aside>
     </>

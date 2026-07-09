@@ -7,12 +7,13 @@ export const getTransactions = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const [transactions, total] = await Promise.all([
-      Transaction.find( { userId: req.user._id })
-        .populate("stockId", "symbol name currentPrice sector")
-        .populate("orderId", "type orderType status executedAt")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
+      Transaction.find({ userId: req.user._id })
+      .populate("stockId", "symbol name")
+      .populate("orderId", "type orderType status")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
       Transaction.countDocuments( { userId: req.user._id }),
     ]);
 

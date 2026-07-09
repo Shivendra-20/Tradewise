@@ -14,7 +14,7 @@ export const getAllStocks = async (req, res) => {
 
     const [stocks, total] = await Promise.all([
       Stock.find(filter)
-        .select("symbol name currentPrice marketCap") // only what the client needs
+        .select("_id symbol name currentPrice marketCap") // only what the client needs
         .sort({ symbol: 1 })
         .skip(skip)
         .limit(limit)

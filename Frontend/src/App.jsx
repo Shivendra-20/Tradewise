@@ -10,6 +10,8 @@ import Profile from "./pages/Profile.jsx";
 import Watchlist from "./pages/Watchlist.jsx";
 import Stock from "./pages/Stock.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
+import Orders from "./pages/Orders.jsx"
+import Transactions from "./pages/Transactions.jsx";
 
 function App() {
   return (
@@ -71,6 +73,8 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/orders" element={<Orders />} />
+      <Route path="/transactions" element={<Transactions />} />
     </Routes>
   );
 }
