@@ -1,46 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createChart, CrosshairMode } from "lightweight-charts";
 import { CandlestickChart, LineChart } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext.jsx";
+import { getStockHistory } from "../../api/stock.js";
+import { useLiveQuote, subscribeSymbols } from "../../lib/realtime.js";
 
 const timeframes = ["1D", "1W", "1M", "3M", "1Y"];
 
-// ---------------------------------------------------------------------------
-// Demo fallback so the component still renders something sensible if no
-// `data` prop is passed yet (e.g. while wiring up the real API call).
-// ---------------------------------------------------------------------------
-const DEMO_CLOSES = [2450, 2470, 2462, 2490, 2525, 2510, 2548, 2565];
+function useChart(containerRef, { areaData, candleData, theme, chartType, height, positive, live, timeframe }) {
+  const seriesRef = useRef(null);
 
-function dateFor(i, startDate = "2026-07-01") {
-  const base = new Date(`${startDate}T00:00:00Z`);
-  base.setUTCDate(base.getUTCDate() + i);
-  return base.toISOString().split("T")[0];
-}
-
-// Derive fake OHLC from closes only if real OHLC wasn't provided.
-function closesToOHLC(closes) {
-  return closes.map((close, i) => {
-    const open = i === 0 ? close * 0.998 : closes[i - 1];
-    const wobble = (Math.sin(i * 13.37 + close) * 10000 % 1) * 0.006;
-    const high = Math.max(open, close) * (1 + Math.abs(wobble));
-    const low = Math.min(open, close) * (1 - Math.abs(wobble));
-    return { open, high, low, close };
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Chart renderer — one function, reused wherever this component is mounted.
-// ---------------------------------------------------------------------------
-function useChart(containerRef, { closes, ohlc, theme, chartType, height, positive, startDate }) {
-  
-    useEffect(() => {
+  useEffect(() => {
     const el = containerRef.current;
-    if (!el || !closes?.length) return;
+    if (!el) return;
 
     const isDark = theme === "dark";
     const textColor = isDark ? "#A1A1AA" : "#475569";
     const bgColor = isDark ? "#18181B" : "#FFFFFF";
-    const borderColor = isDark? "rgba(148,163,184,.12)": "rgba(148,163,184,.18)";
+    const borderColor = isDark ? "rgba(148,163,184,.12)" : "rgba(148,163,184,.18)";
 
     const chart = createChart(el, {
       width: el.clientWidth,
@@ -55,27 +32,27 @@ function useChart(containerRef, { closes, ohlc, theme, chartType, height, positi
       timeScale: { borderColor, timeVisible: true },
     });
 
-    if (chartType === "candles") {
-      const candles = ohlc?.length ? ohlc : closesToOHLC(closes);
-      const series = chart.addCandlestickSeries({
-        upColor: "#22c55e",
-        downColor: "#ef4444",
-        borderVisible: false,
-        wickUpColor: "#22c55e",
-        wickDownColor: "#ef4444",
-      });
-      series.setData(candles.map((c, i) => ({ time: dateFor(i, startDate), ...c })));
-    } else {
-      const lineColor = positive ? "#22c55e" : "#ef4444";
-      const series = chart.addAreaSeries({
-        lineColor,
+    let series;
+      if (chartType === "candles") {
+        series = chart.addCandlestickSeries({
+          upColor: "#22c55e",
+          downColor: "#ef4444",
+          borderVisible: false,
+          wickUpColor: "#22c55e",
+          wickDownColor: "#ef4444",
+        });
+        series.setData(candleData);
+      } else {
+      series = chart.addAreaSeries({
+        lineColor: positive ? "#22c55e" : "#ef4444",
         topColor: positive ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)",
         bottomColor: positive ? "rgba(34,197,94,0)" : "rgba(239,68,68,0)",
         lineWidth: 3,
       });
-      series.setData(closes.map((value, i) => ({ time: dateFor(i, startDate), value })));
+      series.setData(areaData);
     }
 
+    seriesRef.current = series;
     chart.timeScale().fitContent();
 
     const resize = () => chart.applyOptions({ width: el.clientWidth });
@@ -83,16 +60,48 @@ function useChart(containerRef, { closes, ohlc, theme, chartType, height, positi
 
     return () => {
       window.removeEventListener("resize", resize);
+      seriesRef.current = null;
       chart.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closes, ohlc, theme, chartType, height, positive, startDate]);
+  }, [areaData, candleData, theme, chartType, height, positive]);
+
+  // Live tick updates: update the current bar instead of rebuilding the chart.
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series || live?.price == null) return;
+
+    try {
+      const isIntraday = timeframe === "1D";
+      const last = chartType === "candles"
+        ? candleData[candleData.length - 1]
+        : areaData[areaData.length - 1];
+
+      const time = isIntraday
+        ? Math.floor(((live.timestamp || Date.now()) / 1000) / 60) * 60
+        : last?.time ?? Math.floor(Date.now() / 1000);
+
+      if (chartType === "candles") {
+        series.update({
+          time,
+          open: last?.open ?? live.price,
+          high: Math.max(last?.high ?? live.price, live.price),
+          low: Math.min(last?.low ?? live.price, live.price),
+          close: live.price,
+        });
+      } else {
+        series.update({ time, value: live.price });
+      }
+    } catch {
+      // ignore transient update errors (series may have been recreated)
+    }
+  }, [live, chartType, timeframe, areaData, candleData]);
 }
 
-function ChartCanvas({ closes, ohlc, theme, chartType, height, positive, startDate }) {
+function ChartCanvas(props) {
   const ref = useRef(null);
-  useChart(ref, { closes, ohlc, theme, chartType, height, positive, startDate });
-  return <div ref={ref} className="w-full" style={{ height }} />;
+  useChart(ref, props);
+  return <div ref={ref} className="w-full" style={{ height: props.height }} />;
 }
 
 function ChartTypeToggle({ chartType, setChartType }) {
@@ -124,28 +133,9 @@ function ChartTypeToggle({ chartType, setChartType }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-/**
- * Reusable stock/price chart. Drop this anywhere: stock detail page,
- * dashboard, watchlist card, portfolio row, etc.
- *
- * Props:
- *  - stock: { companyName, price, change, positive, symbol }
- *  - closes: number[]                 (closing prices — required for real data)
- *  - ohlc: {open,high,low,close}[]    (optional — enables accurate candles)
- *  - startDate: "YYYY-MM-DD"          (first date in the series)
- *  - height: number                   (default 420, use smaller for widgets)
- *  - compact: boolean                 (hides header + timeframe row, chart only)
- *  - showChartTypeToggle: boolean     (default true)
- *  - onTimeframeChange: (tf) => void  (fetch new data for the selected range)
- */
 export default function StockChart({
   stock,
-  closes,
-  ohlc,
-  startDate = "2026-07-01",
+  symbol,
   height = 420,
   compact = false,
   showChartTypeToggle = true,
@@ -154,9 +144,73 @@ export default function StockChart({
   const { theme } = useTheme();
   const [selectedTimeframe, setSelectedTimeframe] = useState("1D");
   const [chartType, setChartType] = useState("area");
+  const [history, setHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyWarning, setHistoryWarning] = useState("");
 
-  const seriesCloses = closes?.length ? closes : DEMO_CLOSES;
-  const positive = stock?.positive ?? true;
+  const activeSymbol = (symbol || stock?.symbol || "").toUpperCase();
+  const live = useLiveQuote(activeSymbol);
+
+  useEffect(() => {
+    if (activeSymbol) subscribeSymbols([activeSymbol]);
+  }, [activeSymbol]);
+
+  const requestIdRef = useRef(0);
+
+  const loadHistory = async () => {
+    const requestId = ++requestIdRef.current;
+    setHistoryLoading(true);
+    setHistoryWarning("");
+
+    try {
+      const res = await getStockHistory(activeSymbol, selectedTimeframe);
+      const candles = res?.data?.data?.candles;
+
+      if (requestId !== requestIdRef.current) return;
+      if (Array.isArray(candles) && candles.length > 0) {
+        setHistory({
+          candles,
+          closes: candles.map((c) => c.close),
+          ohlc: candles.map((c) => ({
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+          })),
+        });
+        if (res?.data?.cached) {
+          setHistoryWarning("Live history unavailable — showing last cached data");
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to load history for ${activeSymbol}:`, error);
+      if (requestId === requestIdRef.current) {
+        setHistoryWarning("Chart data unavailable right now");
+      }
+    } finally {
+      if (requestId === requestIdRef.current) setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeSymbol) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSymbol, selectedTimeframe]);
+
+  const areaData = useMemo(
+    () => (history ? history.candles.map((c) => ({ time: c.time, value: c.close })) : []),
+    [history]
+  );
+  const candleData = useMemo(() => (history ? history.ohlc : []), [history]);
+
+  const displayPrice = live?.price ?? stock?.price;
+  const displayChange = live?.change ?? stock?.change;
+  const displayChangePercent = live?.changePercent ?? stock?.changePercent;
+  const positive = (displayChange ?? 0) >= 0;
+  const hasLive = live?.price != null;
 
   function handleTimeframe(tf) {
     setSelectedTimeframe(tf);
@@ -168,14 +222,26 @@ export default function StockChart({
       {!compact && (
         <div className="flex flex-col gap-5 border-b border-(--border-color) p-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-sm text-(--text-secondary)">
-              {stock?.companyName || "Reliance Industries"}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-(--text-secondary)">
+                {stock?.companyName || stock?.name || "Stock"}
+              </p>
+              {hasLive && (
+                <span className="flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-400">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
+                  Live
+                </span>
+              )}
+            </div>
             <h2 className="mt-2 text-4xl font-bold">
-              ₹{stock?.price || "2,654.40"}
+              ₹{displayPrice != null ? Number(displayPrice).toLocaleString("en-IN") : "—"}
             </h2>
             <p className={`mt-2 font-medium ${positive ? "text-green-500" : "text-red-500"}`}>
-              {stock?.change || "+24.50 (+0.93%)"}
+              {displayChange != null
+                ? `${positive ? "+" : ""}${Number(displayChange).toFixed(2)} (${Number(
+                    displayChangePercent ?? 0
+                  ).toFixed(2)}%)`
+                : "—"}
             </p>
           </div>
 
@@ -198,20 +264,55 @@ export default function StockChart({
                 </button>
               ))}
             </div>
+            {historyLoading && (
+              <p className="text-xs text-(--text-secondary)">Loading chart data…</p>
+            )}
+            {!historyLoading && historyWarning && (
+              <p className="flex items-center gap-2 text-xs text-amber-400">
+                {historyWarning}
+                <button
+                  onClick={loadHistory}
+                  className="rounded-lg border border-(--border-color) px-2 py-0.5 font-medium text-(--text-secondary) transition hover:bg-(--surface-2)"
+                >
+                  Retry
+                </button>
+              </p>
+            )}
           </div>
         </div>
       )}
 
       <div className={compact ? "p-2" : "px-2 pb-2"}>
-        <ChartCanvas
-          closes={seriesCloses}
-          ohlc={ohlc}
-          theme={theme}
-          chartType={chartType}
-          height={height}
-          positive={positive}
-          startDate={startDate}
-        />
+        {!historyLoading && !history && (
+          <div
+            className="flex w-full items-center justify-center rounded-2xl border border-dashed border-(--border-color)"
+            style={{ height }}
+          >
+            <div className="text-center">
+              <p className="text-sm font-medium text-(--text-secondary)">
+                Chart data unavailable
+              </p>
+              <button
+                onClick={loadHistory}
+                className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+        {history && (
+          <ChartCanvas
+            areaData={areaData}
+            candleData={candleData}
+            theme={theme}
+            chartType={chartType}
+            height={height}
+            positive={positive}
+            live={live}
+            timeframe={selectedTimeframe}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
@@ -10,7 +10,7 @@ import Profile from "./pages/Profile.jsx";
 import Watchlist from "./pages/Watchlist.jsx";
 import Stock from "./pages/Stock.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
-import Orders from "./pages/Orders.jsx"
+import Orders from "./pages/Orders.jsx";
 import Transactions from "./pages/Transactions.jsx";
 
 function App() {
@@ -73,8 +73,23 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="/orders" element={<Orders />} />
-      <Route path="/transactions" element={<Transactions />} />
+      <Route
+        path="/orders"
+        element={
+          <ProtectedRoute>
+            <Orders />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/transactions"
+        element={
+          <ProtectedRoute>
+            <Transactions />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

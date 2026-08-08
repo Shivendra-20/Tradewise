@@ -1,19 +1,19 @@
-import { Bell, Menu, Search, UserCircle2 } from "lucide-react";
+import { Menu, Search, UserCircle2 } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 
 import SearchModal from "../common/SearchModal.jsx";
 import ProfileDropdown from "../common/ProfileDropdown.jsx";
+import { getMarketStatus } from "../../lib/marketTime.js";
 
 export default function DashboardNavbar({ onMenuClick }) {
-  const navigate = useNavigate();
-
   const user = useSelector((state) => state.auth.user);
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  const marketStatus = getMarketStatus();
+  const marketOpen = marketStatus === "OPEN";
 
   return (
     <>
@@ -46,6 +46,14 @@ export default function DashboardNavbar({ onMenuClick }) {
               </span>
             </button>
 
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="rounded-2xl border border-(--border-color) bg-(--surface-1) p-2.5 transition hover:bg-(--surface-2) md:hidden"
+              aria-label="Search stocks"
+            >
+              <Search size={20} />
+            </button>
+
           </div>
 
           {/* Right */}
@@ -54,74 +62,35 @@ export default function DashboardNavbar({ onMenuClick }) {
 
             {/* Market Status */}
 
-            <div className="hidden lg:flex items-center gap-2 rounded-2xl border border-green-500/20 bg-green-500/10 px-4 py-2">
-
+            <div
+              className={`hidden lg:flex items-center gap-2 rounded-2xl border px-4 py-2 ${
+                marketOpen
+                  ? "border-green-500/20 bg-green-500/10"
+                  : "border-red-500/20 bg-red-500/10"
+              }`}
+            >
               <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-70"></span>
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500"></span>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-70"></span>
+                <span
+                  className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+                    marketOpen ? "bg-green-500" : "bg-red-500"
+                  }`}
+                ></span>
               </span>
 
               <div>
-                <p className="text-xs text-green-500">
-                  LIVE
+                <p
+                  className={`text-xs font-semibold ${
+                    marketOpen ? "text-green-500" : "text-red-500"
+                  }`}
+                >
+                  {marketOpen ? "MARKET OPEN" : "MARKET CLOSED"}
                 </p>
 
                 <p className="text-xs text-(--text-secondary)">
                   NSE / BSE
                 </p>
               </div>
-
-            </div>
-
-            {/* Notifications */}
-
-            <div className="relative">
-
-              <button
-                onClick={() => setAlertsOpen((v) => !v)}
-                className="rounded-2xl border border-(--border-color) bg-(--surface-1) p-2.5 transition hover:border-blue-500/30 hover:bg-(--surface-2)"
-              >
-                <Bell size={18} />
-              </button>
-
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500"></span>
-
-              {alertsOpen && (
-
-                <div className="absolute right-0 mt-3 w-80 rounded-3xl border border-(--border-color) bg-(--bg-secondary) p-4 shadow-2xl">
-
-                  <h3 className="font-semibold">
-                    Notifications
-                  </h3>
-
-                  <div className="mt-4 space-y-3">
-
-                    <div className="rounded-2xl bg-(--surface-2) p-3">
-                      <p className="text-sm">
-                        Reliance crossed ₹1,590
-                      </p>
-
-                      <p className="mt-1 text-xs text-(--text-secondary)">
-                        High trading volume detected.
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-(--surface-2) p-3">
-                      <p className="text-sm">
-                        Bank Nifty holding support.
-                      </p>
-
-                      <p className="mt-1 text-xs text-(--text-secondary)">
-                        Above 57,200 level.
-                      </p>
-                    </div>
-
-                  </div>
-
-                </div>
-
-              )}
-
             </div>
 
             {/* Profile */}
@@ -163,6 +132,7 @@ export default function DashboardNavbar({ onMenuClick }) {
               <button
                 onClick={() => setProfileOpen((v) => !v)}
                 className="rounded-2xl border border-(--border-color) bg-(--surface-1) p-2.5 transition hover:bg-(--surface-2) sm:hidden"
+                aria-label="Profile menu"
               >
                 <UserCircle2 size={20} />
               </button>

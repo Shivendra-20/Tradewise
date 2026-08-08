@@ -1,14 +1,55 @@
+import { useEffect, useState } from "react";
 import {
   ArrowUpRight,
   TrendingUp,
+  TrendingDown,
   Wallet,
   IndianRupee,
   BriefcaseBusiness,
+  RefreshCw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import api from "../../api/axios.js";
+
+const fmtINR = (n) =>
+  typeof n === "number" && isFinite(n)
+    ? `₹${Math.round(n).toLocaleString("en-IN")}`
+    : "—";
+
+const fmtSigned = (n) =>
+  typeof n === "number" && isFinite(n)
+    ? `${n >= 0 ? "+₹" : "-₹"}${Math.abs(Math.round(n)).toLocaleString("en-IN")}`
+    : "—";
 
 export default function PortfolioCard() {
   const navigate = useNavigate();
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(false);
+
+  const loadPortfolio = async () => {
+    try {
+      setError(false);
+      const res = await api.get("/api/portfolio");
+      setData(res.data);
+    } catch (err) {
+      console.error("Portfolio load failed:", err);
+      setError(true);
+    }
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount
+    loadPortfolio();
+  }, []);
+
+  const summary = data?.summary;
+  const balance = data?.user?.balance;
+  const pl = summary?.totalUnrealizedPL;
+  const plPercent = summary?.totalReturnPercent;
+  const positive = (pl ?? 0) >= 0;
+  const holdingsCount = summary?.holdingsCount ?? 0;
+  const netWorth = summary?.totalNetWorth;
+  const loaded = data !== null;
 
   return (
     <div className="rounded-3xl border border-(--border-color) bg-(--surface-1) p-6 shadow-(--shadow-card) transition-all duration-300 hover:shadow-xl">
@@ -22,12 +63,14 @@ export default function PortfolioCard() {
           </p>
 
           <h2 className="mt-2 text-4xl font-bold tracking-tight text-(--text-primary)">
-            ₹1,00,000
+            {loaded ? fmtINR(netWorth) : "—"}
           </h2>
 
-          <p className="mt-3 flex items-center gap-2 font-medium text-green-500">
-            <TrendingUp size={17} />
-            +₹4,520 (+4.52%)
+          <p className={`mt-3 flex items-center gap-2 font-medium ${positive ? "text-green-500" : "text-red-500"}`}>
+            {positive ? <TrendingUp size={17} /> : <TrendingDown size={17} />}
+            {loaded
+              ? `${fmtSigned(pl)} (${plPercent >= 0 ? "+" : ""}${plPercent?.toFixed?.(2) ?? 0}%)`
+              : "—"}
           </p>
         </div>
 
@@ -40,33 +83,33 @@ export default function PortfolioCard() {
 
       <div className="mt-8 space-y-3">
 
-        {/* Today's P/L */}
+        {/* Unrealized P/L */}
 
         <div className="flex items-center justify-between rounded-2xl border border-(--border-color) bg-(--surface-2) px-4 py-4 transition hover:scale-[1.02]">
 
           <div className="flex items-center gap-3">
 
-            <div className="rounded-xl bg-green-500/10 p-2.5">
+            <div className={`rounded-xl p-2.5 ${positive ? "bg-green-500/10" : "bg-red-500/10"}`}>
               <TrendingUp
                 size={18}
-                className="text-green-500"
+                className={positive ? "text-green-500" : "text-red-500"}
               />
             </div>
 
             <div>
               <p className="text-xs text-(--text-secondary)">
-                Today's P/L
+                Unrealized P/L
               </p>
 
-              <p className="font-semibold text-(--text-primary)">
-                +₹2,540
+              <p className={`font-semibold text-(--text-primary)`}>
+                {loaded ? fmtSigned(pl) : "—"}
               </p>
             </div>
 
           </div>
 
-          <span className="text-sm font-semibold text-green-500">
-            +2.54%
+          <span className={`text-sm font-semibold ${positive ? "text-green-500" : "text-red-500"}`}>
+            {loaded ? `${plPercent >= 0 ? "+" : ""}${plPercent?.toFixed?.(2) ?? 0}%` : "—"}
           </span>
 
         </div>
@@ -90,7 +133,7 @@ export default function PortfolioCard() {
               </p>
 
               <p className="font-semibold text-(--text-primary)">
-                ₹76,350
+                {loaded ? fmtINR(balance) : "—"}
               </p>
             </div>
 
@@ -117,7 +160,7 @@ export default function PortfolioCard() {
               </p>
 
               <p className="font-semibold text-(--text-primary)">
-                14 Stocks
+                {loaded ? `${holdingsCount} Stock${holdingsCount === 1 ? "" : "s"}` : "—"}
               </p>
             </div>
 
@@ -131,16 +174,31 @@ export default function PortfolioCard() {
 
       </div>
 
+      {error && (
+        <p className="mt-4 text-center text-xs text-red-400">
+          Couldn't load your portfolio.
+        </p>
+      )}
+
       {/* Footer */}
 
-      <button
-        onClick={() => navigate("/portfolio")}
-        className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 font-semibold text-white transition-all duration-300 hover:bg-blue-500 hover:shadow-lg"
-      >
-        View Portfolio
+      <div className="mt-8 flex gap-3">
+        <button
+          onClick={() => navigate("/portfolio")}
+          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 font-semibold text-white transition-all duration-300 hover:bg-blue-500 hover:shadow-lg"
+        >
+          View Portfolio
+          <ArrowUpRight size={18} />
+        </button>
 
-        <ArrowUpRight size={18} />
-      </button>
+        <button
+          onClick={loadPortfolio}
+          title="Refresh portfolio"
+          className="flex items-center justify-center rounded-2xl border border-(--border-color) bg-(--surface-2) px-4 text-(--text-secondary) transition hover:bg-(--surface-1)"
+        >
+          <RefreshCw size={18} />
+        </button>
+      </div>
 
     </div>
   );

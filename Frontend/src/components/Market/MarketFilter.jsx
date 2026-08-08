@@ -2,16 +2,19 @@ import { Search, RotateCcw } from "lucide-react";
 
 const exchanges = ["All", "NSE", "BSE"];
 
-const sectors = [
+const fallbackSectors = [
   "All",
-  "Banking",
-  "IT",
-  "Energy",
-  "Pharma",
-  "Auto",
-  "FMCG",
-  "Metal",
+  "Technology",
   "Finance",
+  "Healthcare",
+  "Energy",
+  "Consumer Goods",
+  "Industrials",
+  "Real Estate",
+  "Utilities",
+  "Materials",
+  "Communication",
+  "Other",
 ];
 
 const sortOptions = [
@@ -25,7 +28,10 @@ const sortOptions = [
 export default function MarketFilters({
   filters,
   setFilters,
+  sectors = [],
 }) {
+  const sectorOptions = ["All", ...(sectors.length ? sectors : fallbackSectors.slice(1))];
+
   function handleChange(key, value) {
     setFilters((prev) => ({
       ...prev,
@@ -91,7 +97,7 @@ export default function MarketFilters({
           }
           className="h-12 rounded-2xl border border-(--border-color) bg-(--surface-1) px-4 outline-none"
         >
-          {sectors.map((item) => (
+          {sectorOptions.map((item) => (
             <option key={item}>{item}</option>
           ))}
         </select>

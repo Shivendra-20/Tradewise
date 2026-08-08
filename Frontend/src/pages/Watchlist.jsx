@@ -6,12 +6,6 @@ import DashboardLayout from "../components/Layout/DashboardLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import api from "../api/axios.js";
 
-const DEMO_WATCHLIST = [
-  { symbol: "RELIANCE", name: "Reliance Industries", price: 1586.4, change: 2.31 },
-  { symbol: "TCS", name: "Tata Consultancy", price: 3982.2, change: 1.84 },
-  { symbol: "HDFCBANK", name: "HDFC Bank", price: 1923.6, change: 0.92 },
-];
-
 export default function Watchlist() {
   const navigate = useNavigate();
   const [watchlist, setWatchlist] = useState(null); // null = loading
@@ -23,7 +17,7 @@ export default function Watchlist() {
   async function fetchWatchlist() {
     try {
       setError(false);
-      const res = await api.get("/watchlist");
+      const res = await api.get("/api/watchlist");
 
     const data = res.data.data.map((item) => ({
         stockId: item.stockId._id,
@@ -37,11 +31,12 @@ export default function Watchlist() {
     } catch (err) {
       console.error("Failed to load watchlist:", err);
       setError(true);
-      setWatchlist(DEMO_WATCHLIST);
+      setWatchlist([]);
     }
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount
     fetchWatchlist();
   }, []);
 
@@ -52,7 +47,7 @@ export default function Watchlist() {
     setRemovingSymbol(stockId);
 
     try {
-     await api.delete(`/watchlist/remove/${stockId}`);
+     await api.delete(`/api/watchlist/remove/${stockId}`);
     } catch (err) {
       console.error("Failed to remove from watchlist:", err);
       setWatchlist(previous); // rollback on failure
@@ -88,7 +83,7 @@ export default function Watchlist() {
 
           {error && (
             <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-              Couldn't reach the server — showing demo data.
+              Couldn't reach the server.
               <button onClick={fetchWatchlist} className="ml-auto flex items-center gap-1 font-medium hover:underline">
                 <RefreshCw size={12} /> Retry
               </button>
@@ -116,7 +111,7 @@ export default function Watchlist() {
             ) : (
               list.map((stock) => {
                 const isPositive = stock.change >= 0;
-                const isRemoving = removingSymbol === stock.symbol;
+                const isRemoving = removingSymbol === stock.stockId;
                 return (
                   <div
                     key={stock.symbol}
@@ -137,7 +132,7 @@ export default function Watchlist() {
                         </p>
                       </div>
                       <button
-                        onClick={() => navigate(`/stocks/${stock.symbol}`)}
+                        onClick={() => navigate(`/stock/${stock.symbol}`)}
                         title="View chart"
                         className="rounded-xl border border-(--border-color) bg-(--surface-1) p-2 text-(--text-secondary) transition hover:border-green-500 hover:text-green-400"
                       >

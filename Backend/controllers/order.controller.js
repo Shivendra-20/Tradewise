@@ -23,7 +23,6 @@ export const placeOrder = async (req, res) => {
   const { stockId, type, orderType = "market", quantity, price } = req.body;
 
   // fix #3 — validate everything BEFORE starting a session
-  console.log(req.body);
   if (!stockId || !type || !quantity) {
     return res.status(400).json({ success: false, message: "stockId, type, and quantity are required" });
   }

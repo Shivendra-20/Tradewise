@@ -1,4 +1,3 @@
-import React from 'react'
 import Navbar from '../components/Landing/LandNavbar.jsx'
 import Hero from '../components/Landing/Hero.jsx'
 

@@ -26,7 +26,7 @@ export default function Transactions() {
       setLoading(true);
       setError(false);
 
-      const res = await api.get("/transaction");
+      const res = await api.get("/api/transaction");
 
       setTransactions(res.data.transactions || []);
     } catch (err) {
@@ -38,6 +38,7 @@ export default function Transactions() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount
     fetchTransactions();
   }, []);
 

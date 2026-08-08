@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { Search, RefreshCw, XCircle, ShoppingBag, CheckCircle, AlertCircle, Ban } from "lucide-react";
 import DashboardLayout from "../components/Layout/DashboardLayout.jsx";
 import Card from "../components/common/Card.jsx";
@@ -18,7 +17,7 @@ export default function Orders() {
     try {
       setLoading(true);
       setError(false);
-      const res = await api.get("/orders");
+      const res = await api.get("/api/orders");
       // Fixed: Now accurately targeting res.data.data as per your backend controller
       setOrders(res.data.data || []);
     } catch (err) {
@@ -30,6 +29,7 @@ export default function Orders() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount
     fetchOrders();
   }, []);
 
@@ -37,7 +37,7 @@ export default function Orders() {
   async function handleCancelOrder(orderId) {
     if (!window.confirm("Are you sure you want to cancel this order?")) return;
     try {
-      await api.patch(`/orders/cancel/${orderId}`);
+      await api.patch(`/api/orders/cancel/${orderId}`);
       fetchOrders(); // Refresh data after successful cancellation
     } catch (err) {
       console.error("Failed to cancel order:", err);

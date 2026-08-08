@@ -1,17 +1,41 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   TrendingUp,
   TrendingDown,
   Star,
 } from "lucide-react";
+import { useLiveQuote, subscribeSymbols } from "../../lib/realtime.js";
+import { addToWatchlist, removeFromWatchlist } from "../../api/watchlist.js";
 
-export default function StockCard({
-  stock,
-  onWatchlist,
-}) {
+export default function StockCard({ stock }) {
   const navigate = useNavigate();
+  const live = useLiveQuote(stock?.symbol);
+  const [watchlisted, setWatchlisted] = useState(stock?.watchlisted || false);
 
-  const positive = stock?.change >= 0;
+  useEffect(() => {
+    if (stock?.symbol) subscribeSymbols([stock.symbol]);
+  }, [stock?.symbol]);
+
+  const toggleWatchlist = async (e) => {
+    e.stopPropagation();
+    if (!stock?._id) return;
+    try {
+      if (watchlisted) {
+        await removeFromWatchlist(stock._id);
+      } else {
+        await addToWatchlist(stock._id);
+      }
+      setWatchlisted((v) => !v);
+    } catch (err) {
+      console.error("Watchlist toggle failed:", err);
+    }
+  };
+
+  const price = live?.price ?? stock?.price;
+  const change = live?.change ?? stock?.change;
+  const changePercent = live?.changePercent ?? stock?.changePercent;
+  const positive = change >= 0;
 
   return (
     <div
@@ -43,16 +67,13 @@ export default function StockCard({
         </div>
 
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onWatchlist?.(stock);
-          }}
+          onClick={toggleWatchlist}
           className="rounded-xl p-2 transition hover:bg-(--surface-1)"
         >
           <Star
             size={18}
             className={
-              stock.watchlisted
+              watchlisted
                 ? "fill-yellow-400 text-yellow-400"
                 : "text-(--text-secondary)"
             }
@@ -66,7 +87,7 @@ export default function StockCard({
       <div className="mt-4">
 
        <h2 className="text-2xl font-bold">
-          ₹{stock.price.toLocaleString()}
+          ₹{price?.toLocaleString()}
         </h2>
 
         <div
@@ -83,11 +104,11 @@ export default function StockCard({
           )}
 
           {positive ? "+" : ""}
-          {stock.change}
+          {change?.toFixed?.(2) ?? change}
 
           <span>
             ({positive ? "+" : ""}
-            {stock.changePercent}%)
+            {changePercent?.toFixed?.(2) ?? changePercent}%)
           </span>
 
         </div>
@@ -106,7 +127,7 @@ export default function StockCard({
           </p>
 
           <p className="mt-1 font-semibold">
-            {stock.marketCap}
+            {stock.marketCap || "—"}
           </p>
 
         </div>
@@ -123,13 +144,6 @@ export default function StockCard({
 
         </div>
 
-      </div>
-
-      {/* Footer */}
-
-   <div className="mt-4 flex gap-2">
-
-        
       </div>
 
     </div>

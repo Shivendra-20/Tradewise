@@ -1,32 +1,47 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const stockCatalog = [
-  { symbol: "RELIANCE", name: "Reliance Industries", price: 1586.4, change: 2.31, sector: "Energy" },
-  { symbol: "TCS", name: "Tata Consultancy Services", price: 3982.2, change: 1.84, sector: "Technology" },
-  { symbol: "INFY", name: "Infosys", price: 1742.5, change: -0.52, sector: "Technology" },
-  { symbol: "HDFCBANK", name: "HDFC Bank", price: 1923.6, change: 0.92, sector: "Banking" },
-  { symbol: "ICICIBANK", name: "ICICI Bank", price: 1488.1, change: 1.22, sector: "Banking" },
-  { symbol: "SBIN", name: "State Bank of India", price: 845.75, change: -1.02, sector: "Banking" },
-  { symbol: "LT", name: "Larsen & Toubro", price: 3514.8, change: -1.36, sector: "Infra" },
-  { symbol: "ADANIENT", name: "Adani Enterprises", price: 2487.3, change: -2.91, sector: "Conglomerate" },
-];
+import { searchStocks } from "../../api/stock.js";
 
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset query on close
     if (!open) setQuery("");
   }, [open]);
 
-  const results = useMemo(() => {
-    if (!query.trim()) return stockCatalog.slice(0, 6);
-    return stockCatalog.filter((stock) =>
-      `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())
-    );
+  useEffect(() => {
+    const token = setTimeout(async () => {
+      const q = query.trim();
+      if (!q) {
+        setResults([]);
+        return;
+      }
+      try {
+        setLoading(true);
+        const res = await searchStocks(q);
+        if (res?.data?.success) {
+          setResults(res.data.data || []);
+        } else {
+          setResults([]);
+        }
+      } catch (err) {
+        console.error("Search failed", err);
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(token);
   }, [query]);
+
+  const fallback = [];
+  const display = query.trim() ? results : fallback;
 
   if (!open) return null;
 
@@ -46,7 +61,8 @@ export default function SearchModal({ open, onClose }) {
         </div>
 
         <div className="mt-4 space-y-2">
-          {results.map((stock) => (
+          {loading && <div className="text-sm text-(--text-secondary)">Searching...</div>}
+          {display.map((stock) => (
             <button
               key={stock.symbol}
               onClick={() => {
@@ -60,9 +76,9 @@ export default function SearchModal({ open, onClose }) {
                 <p className="text-sm text-(--text-secondary)">{stock.name}</p>
               </div>
               <div className="text-right">
-                <p className="font-medium">₹{stock.price.toLocaleString()}</p>
+                <p className="font-medium">{stock.currentPrice ? `₹${stock.currentPrice.toLocaleString()}` : "-"}</p>
                 <p className={`text-sm ${stock.change >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {stock.change >= 0 ? "+" : ""}{stock.change}%
+                  {stock.change >= 0 ? "+" : ""}{stock.change ?? ""}
                 </p>
               </div>
             </button>

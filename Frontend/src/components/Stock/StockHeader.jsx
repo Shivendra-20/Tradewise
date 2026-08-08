@@ -7,11 +7,12 @@ export default function StockHeader({ stock }) {
   const navigate = useNavigate();
 
   const positive = stock.change >= 0;
+  const isRealStock = /^[a-f\d]{24}$/i.test(stock._id || "");
 const [isWatchlisted, setIsWatchlisted] = useState(false);
   useEffect(() => {
   async function checkWatchlist() {
     try {
-      const res = await api.get("/watchlist");
+      const res = await api.get("/api/watchlist");
 
       const exists = res.data.data.some(
         (item) => item.stockId._id === stock._id
@@ -23,18 +24,18 @@ const [isWatchlisted, setIsWatchlisted] = useState(false);
     }
   }
 
-  if (stock?._id) {
+  if (isRealStock) {
     checkWatchlist();
   }
-}, [stock]);
+}, [stock, isRealStock]);
 
 const toggleWatchlist = async () => {
   try {
     if (isWatchlisted) {
-      await api.delete(`/watchlist/remove/${stock._id}`);
+      await api.delete(`/api/watchlist/remove/${stock._id}`);
       setIsWatchlisted(false);
     } else {
-      await api.post("/watchlist/add", {
+      await api.post("/api/watchlist/add", {
         stockId: stock._id,
       });
       setIsWatchlisted(true);
@@ -121,7 +122,7 @@ const toggleWatchlist = async () => {
               <TrendingDown size={20} />
             )}
 
-            ₹{stock.change} ({stock.changePercent}%)
+            ₹{stock.change.toFixed(2)} ({stock.changePercent.toFixed(2)}%)
           </div>
 
         </div>

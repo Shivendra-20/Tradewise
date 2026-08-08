@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Wallet, RefreshCw } from "lucide-react";
+import { Wallet, RefreshCw } from "lucide-react";
 import DashboardLayout from "../components/Layout/DashboardLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import { formatCurrency, formatPercent } from "../lib/formatters.js";
@@ -17,7 +17,7 @@ export default function Portfolio() {
   async function fetchPortfolio() {
     try {
       setError(false);
-      const portfolioRes = await api.get("/portfolio");
+      const portfolioRes = await api.get("/api/portfolio");
       
       setRawHoldings(portfolioRes.data.holdings);
       setSummary(portfolioRes.data.summary);
@@ -32,6 +32,7 @@ export default function Portfolio() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount
     fetchPortfolio();
   }, []);
 
@@ -66,7 +67,7 @@ export default function Portfolio() {
 
           {error && (
             <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-              Couldn't reach the server — showing demo data.
+              Couldn't reach the server.
               <button onClick={fetchPortfolio} className="ml-auto flex items-center gap-1 font-medium hover:underline">
                 <RefreshCw size={12} /> Retry
               </button>
@@ -166,20 +167,6 @@ export default function Portfolio() {
               </table>
             </div>
           )}
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">Next move</h2>
-              <p className="mt-1 text-sm text-(--text-secondary)">
-                Stay aligned with your strategy and rebalance when needed.
-              </p>
-            </div>
-            <button className="flex items-center gap-2 rounded-xl bg-green-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-green-400">
-              Review plan <ArrowUpRight size={16} />
-            </button>
-          </div>
         </Card>
       </div>
     </DashboardLayout>

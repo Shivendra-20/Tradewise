@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../../redux/authSlice";
 import { useTheme } from "../../context/ThemeContext";
+import api from "../../api/axios.js";
 
 export default function ProfileDropdown({
   open,
@@ -84,12 +85,10 @@ export default function ProfileDropdown({
 
 async function handleLogout() {
   try {
-    await axios.post(
-      "http://localhost:5000/api/auth/logout",
-      {},
-      { withCredentials: true }
-    );
-  } catch (err) {}
+    await api.post("/api/auth/logout");
+  } catch (err) {
+    console.error("Logout failed:", err);
+  }
 
   dispatch(logout());
 

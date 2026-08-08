@@ -41,6 +41,12 @@ const stockSchema = new mongoose.Schema(
       default: "NSE",
     },
 
+    // Upstox instrument key (e.g. NSE_EQ|INE002A01018) for quote/history calls
+    instrumentKey: {
+      type: String,
+      default: "",
+    },
+
     // Current live price (updated via WebSocket / cron job)
     currentPrice: {
       type: Number,

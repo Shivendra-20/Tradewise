@@ -112,7 +112,7 @@ const tickerData = [
         <div className="hidden lg:flex justify-center">
 
           <img
-            src="/images.jpg"
+            src="/trade2.png "
             alt="dashboard"
             className="rounded-3xl shadow-2xl border border-white/10"
           />

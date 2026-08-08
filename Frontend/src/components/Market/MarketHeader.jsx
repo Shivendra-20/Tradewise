@@ -9,7 +9,15 @@ import {
 export default function MarketHeader({
   onSearch,
   marketStatus = "OPEN",
+  stats = {},
 }) {
+  const fmt = (n) =>
+    typeof n === "number" && isFinite(n) ? n.toLocaleString("en-IN") : n;
+
+  const volumeCr = stats.volume
+    ? `₹${(stats.volume / 10000000000).toFixed(2)}L Cr`
+    : "—";
+
   return (
     <div className="relative overflow-hidden rounded-3xl border border-(--border-color) bg-(--bg-secondary) p-7 shadow-lg">
 
@@ -78,7 +86,7 @@ export default function MarketHeader({
             </div>
 
             <h2 className="mt-4 text-3xl font-bold">
-              5000+
+              {fmt(stats.listed) || "5000+"}
             </h2>
 
           </div>
@@ -96,7 +104,7 @@ export default function MarketHeader({
             </div>
 
             <h2 className="mt-4 text-3xl font-bold text-green-500">
-              +178
+              {fmt(stats.gainers) ?? "+178"}
             </h2>
 
           </div>
@@ -114,7 +122,7 @@ export default function MarketHeader({
             </div>
 
             <h2 className="mt-4 text-3xl font-bold text-red-500">
-              -132
+              {fmt(stats.losers) ?? "-132"}
             </h2>
 
           </div>
@@ -132,7 +140,7 @@ export default function MarketHeader({
             </div>
 
             <h2 className="mt-4 text-3xl font-bold">
-              ₹2.8L Cr
+              {volumeCr}
             </h2>
 
           </div>

@@ -8,45 +8,54 @@ import {
 } from "lucide-react";
 
 export default function StockStats({ stock }) {
+  const fmt = (value) =>
+    typeof value === "number" && value > 0 ? `₹${value.toLocaleString("en-IN")}` : "—";
+
   const stats = [
     {
       title: "Open",
-      value: `₹${stock?.open ?? "2,640.00"}`,
+      value: fmt(stock?.open),
       icon: ArrowUp,
       color: "text-green-500",
       bg: "bg-green-500/10",
     },
     {
       title: "High",
-      value: `₹${stock?.high ?? "2,675.80"}`,
+      value: fmt(stock?.high),
       icon: Activity,
       color: "text-emerald-500",
       bg: "bg-emerald-500/10",
     },
     {
       title: "Low",
-      value: `₹${stock?.low ?? "2,621.45"}`,
+      value: fmt(stock?.low),
       icon: ArrowDown,
       color: "text-red-500",
       bg: "bg-red-500/10",
     },
     {
       title: "Prev Close",
-      value: `₹${stock?.previousClose ?? "2,629.90"}`,
+      value: fmt(stock?.previousClose),
       icon: Clock3,
       color: "text-blue-500",
       bg: "bg-blue-500/10",
     },
     {
       title: "Volume",
-      value: stock?.volume?.toLocaleString("en-IN") ?? "18,42,320",
+      value:
+        typeof stock?.volume === "number" && stock.volume > 0
+          ? stock.volume.toLocaleString("en-IN")
+          : "—",
       icon: BarChart3,
       color: "text-purple-500",
       bg: "bg-purple-500/10",
     },
     {
       title: "Market Cap",
-      value: stock?.marketCap ?? "₹17.9 L Cr",
+      value:
+        typeof stock?.marketCap === "number" && stock.marketCap > 0
+          ? `₹${(stock.marketCap / 10000000).toFixed(2)} Cr`
+          : "—",
       icon: IndianRupee,
       color: "text-amber-500",
       bg: "bg-amber-500/10",

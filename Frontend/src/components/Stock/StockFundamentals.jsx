@@ -2,7 +2,6 @@ import {
   Building2,
   BarChart3,
   TrendingUp,
-  Percent,
 } from "lucide-react";
 
 function Metric({ title, value }) {
@@ -19,7 +18,29 @@ function Metric({ title, value }) {
   );
 }
 
+const formatCr = (value) =>
+  typeof value === "number" && value > 0
+    ? `₹${(value / 10000000).toFixed(2)} Cr`
+    : "—";
+
+const formatINR = (value) =>
+  typeof value === "number" && value > 0
+    ? `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
+    : "—";
+
+const formatRatio = (value) =>
+  typeof value === "number" && value > 0
+    ? value.toFixed(2)
+    : "—";
+
+const formatPercent = (value) =>
+  typeof value === "number"
+    ? `${(value * 100).toFixed(2)}%`
+    : "—";
+
 export default function StockFundamentals({ stock }) {
+  const f = stock?.fundamentals ?? {};
+
   return (
     <div className="rounded-3xl border border-(--border-color) bg-(--bg-secondary) p-6 shadow-lg">
 
@@ -43,42 +64,42 @@ export default function StockFundamentals({ stock }) {
 
         <Metric
           title="Market Cap"
-          value={stock?.marketCap || "₹18.35 L Cr"}
+          value={formatCr(f.marketCap ?? stock?.marketCap)}
         />
 
         <Metric
           title="P/E Ratio"
-          value={stock?.pe || "28.64"}
+          value={formatRatio(f.peRatio)}
         />
 
         <Metric
           title="P/B Ratio"
-          value={stock?.pb || "2.15"}
+          value={formatRatio(f.priceToBook)}
         />
 
         <Metric
           title="Dividend Yield"
-          value={stock?.dividendYield || "0.42%"}
+          value={formatPercent(f.dividendYield)}
         />
 
         <Metric
           title="EPS"
-          value={stock?.eps || "₹94.30"}
+          value={formatINR(f.eps)}
         />
 
         <Metric
           title="ROE"
-          value={stock?.roe || "18.60%"}
+          value={formatPercent(f.roe)}
         />
 
         <Metric
           title="ROCE"
-          value={stock?.roce || "21.75%"}
+          value={f.roce ? formatPercent(f.roce) : "—"}
         />
 
         <Metric
           title="Book Value"
-          value={stock?.bookValue || "₹1152.40"}
+          value={formatINR(f.bookValue)}
         />
 
       </div>
@@ -101,7 +122,7 @@ export default function StockFundamentals({ stock }) {
                 Sector
               </span>
 
-              <span>{stock?.sector || "Energy"}</span>
+              <span>{stock?.sector || "—"}</span>
             </div>
 
             <div className="flex justify-between">
@@ -109,7 +130,7 @@ export default function StockFundamentals({ stock }) {
                 Industry
               </span>
 
-              <span>{stock?.industry || "Oil & Gas"}</span>
+              <span>{stock?.industry || "—"}</span>
             </div>
 
             <div className="flex justify-between">
@@ -117,7 +138,7 @@ export default function StockFundamentals({ stock }) {
                 Exchange
               </span>
 
-              <span>{stock?.exchange || "NSE"}</span>
+              <span>{stock?.exchange || "—"}</span>
             </div>
 
           </div>
@@ -140,7 +161,7 @@ export default function StockFundamentals({ stock }) {
                 52W High
               </span>
 
-              <span>{stock?.high52 || "₹2,745"}</span>
+              <span>{formatINR(stock?.weekHigh52)}</span>
             </div>
 
             <div className="flex justify-between">
@@ -148,15 +169,19 @@ export default function StockFundamentals({ stock }) {
                 52W Low
               </span>
 
-              <span>{stock?.low52 || "₹2,120"}</span>
+              <span>{formatINR(stock?.weekLow52)}</span>
             </div>
 
             <div className="flex justify-between">
               <span className="text-(--text-secondary)">
-                Face Value
+                Day Range
               </span>
 
-              <span>{stock?.faceValue || "₹10"}</span>
+              <span>
+                {stock?.dayLow > 0 || stock?.dayHigh > 0
+                  ? `${formatINR(stock.dayLow)} – ${formatINR(stock.dayHigh)}`
+                  : "—"}
+              </span>
             </div>
 
           </div>

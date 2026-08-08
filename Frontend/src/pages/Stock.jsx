@@ -7,11 +7,9 @@ import OrderPanel from "../components/Stock/OrderPanel.jsx";
 import StockStats from "../components/Stock/StockStats.jsx";
 import CompanyInfo from "../components/Stock/CompanyOverview.jsx";
 import Financials from "../components/Stock/NewsSection.jsx";
-import StockFundamentals from "../components/Stock/StockFundamentals.jsx"
+import StockFundamentals from "../components/Stock/StockFundamentals.jsx";
 import { useEffect, useState } from "react";
-import api from "../api/axios";
-
-import { getStockProfile } from "../lib/stockMockData.js";  
+import { getStockDetails, getLiveQuote } from "../api/stock.js";
 
 export default function Stock() {
   const { symbol } = useParams();
@@ -19,15 +17,56 @@ export default function Stock() {
   const [stock, setStock] = useState(null);
 
 useEffect(() => {
-  api.get(`/stocks/${symbol}`)
-    .then((res) => {
+  let intervalId;
+
+  const loadStock = async () => {
+    try {
+      const res = await getStockDetails(symbol);
+      const details = res.data.data;
+
       setStock({
-        ...res.data.data,
-        companyName: res.data.data.name,
-        price: res.data.data.currentPrice,
+        ...details,
+        companyName: details.name,
+        price: details.currentPrice,
+        change: details.change ?? 0,
+        changePercent: details.changePercent ?? 0,
+        open: details.open ?? details.dayHigh ?? 0,
+        high: details.high ?? details.dayHigh ?? 0,
+        low: details.low ?? details.dayLow ?? 0,
       });
-    })
-    .catch(console.error);
+    } catch (error) {
+      console.error("Failed to load stock details:", error);
+    }
+  };
+
+  const loadLiveQuote = async () => {
+    try {
+      const response = await getLiveQuote(symbol);
+      const quote = response.data.data;
+      setStock((prev) =>
+        prev
+          ? {
+              ...prev,
+              price: quote.price ?? prev.price,
+              change: quote.change ?? prev.change,
+              changePercent: quote.changePercent ?? prev.changePercent,
+              open: quote.open ?? prev.open,
+              high: quote.high ?? prev.high,
+              low: quote.low ?? prev.low,
+              volume: quote.volume ?? prev.volume,
+              previousClose: quote.previousClose ?? prev.previousClose,
+            }
+          : prev
+      );
+    } catch (error) {
+      console.error("Failed to load live quote:", error);
+    }
+  };
+
+  loadStock();
+  intervalId = setInterval(loadLiveQuote, 5000);
+
+  return () => clearInterval(intervalId);
 }, [symbol]);
 
  if (!stock) {
@@ -67,7 +106,7 @@ useEffect(() => {
         {/* Company + Financials */}
 
     <div className="mt-6">
-      <StockFundamentals/>
+      <StockFundamentals stock={stock} />
     </div>
 
         <div className="grid gap-6 xl:grid-cols-2">

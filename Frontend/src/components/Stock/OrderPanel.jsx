@@ -11,9 +11,9 @@ export default function OrderPanel({ stock }) {
   const [side, setSide] = useState("BUY");
   const [orderType, setOrderType] = useState("MARKET");
   const [quantity, setQuantity] = useState(1);
-  const [limitPrice, setLimitPrice] = useState(stock?.price || 2654.4);
+  const [limitPrice, setLimitPrice] = useState(stock?.price || 0);
 
-  const marketPrice = stock?.price || 2654.4;
+  const marketPrice = stock?.price || 0;
 
   const executionPrice =
     orderType === "MARKET" ? marketPrice : limitPrice;
@@ -27,8 +27,6 @@ const placeOrder = async () => {
 
   try {
 
-    console.log({ stock, stockId: stock?._id, type: side.toLowerCase(), quantity,});
-
     const payload = {
       stockId: stock._id,
       type: side.toLowerCase(), // buy | sell
@@ -38,7 +36,7 @@ const placeOrder = async () => {
     };
 
 
-    const res = await api.post("/orders", payload);
+    const res = await api.post("/api/orders", payload);
 
     alert(res.data.message);
 

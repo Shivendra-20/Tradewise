@@ -6,7 +6,7 @@ export const marketIndices = [
     change: 185.25,
     percent: 0.73,
     positive: true,
-    stockSymbol: "NIFTY",
+    stockSymbol: "NIFTY50",
   },
   {
     id: 2,
@@ -24,7 +24,7 @@ export const marketIndices = [
     change: 425.40,
     percent: 0.74,
     positive: true,
-    stockSymbol: "BANKNIFTY",
+    stockSymbol: "NIFTYBANK",
   },
   {
     id: 4,
@@ -33,6 +33,6 @@ export const marketIndices = [
     change: 112.60,
     percent: 0.42,
     positive: true,
-    stockSymbol: "FINNIFTY",
+    stockSymbol: "NIFTYFIN",
   },
 ];

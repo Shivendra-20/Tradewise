@@ -4,7 +4,6 @@ import {
   LayoutGrid,
   Moon,
   Sun,
-  TrendingUp,
   Wallet,
   Eye,
   ClipboardList,
