@@ -107,6 +107,8 @@ export default function MarketMovers() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount
     loadMovers();
+    const id = setInterval(loadMovers, 60000);
+    return () => clearInterval(id);
   }, []);
 
   const data = movers[activeTab] || [];

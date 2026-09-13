@@ -6,8 +6,8 @@ const API_URI = import.meta.env.VITE_API_URI || "http://localhost:5000";
 let socket = null;
 let connectAttempted = false;
 
-const quoteStore = new Map(); // symbol -> latest tick
-const listeners = new Set();  // store change callbacks
+const quoteStore = new Map();
+const listeners = new Set();
 const requestedSymbols = new Set();
 
 function notify() {
@@ -20,6 +20,15 @@ function onConnect() {
   }
 }
 
+function setupVisibilityListener() {
+  if (typeof document === "undefined") return;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && socket && !socket.connected) {
+      socket.connect();
+    }
+  });
+}
+
 export function getSocket() {
   if (socket || connectAttempted) return socket;
   connectAttempted = true;
@@ -28,8 +37,10 @@ export function getSocket() {
 
   socket = io(API_URI, {
     auth: { token },
-    transports: ["websocket"],
-    reconnectionAttempts: 5,
+    transports: ["websocket", "polling"],
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
   });
 
   socket.on("connect", onConnect);
@@ -54,6 +65,8 @@ export function getSocket() {
       connectAttempted = false;
     }
   });
+
+  setupVisibilityListener();
 
   return socket;
 }

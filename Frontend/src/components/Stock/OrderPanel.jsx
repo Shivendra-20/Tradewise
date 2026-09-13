@@ -6,6 +6,7 @@ import {
   Layers3,
 } from "lucide-react";
 import api from "../../api/axios.js"
+import { useLiveQuote } from "../../lib/realtime.js";
 
 export default function OrderPanel({ stock }) {
   const [side, setSide] = useState("BUY");
@@ -13,7 +14,8 @@ export default function OrderPanel({ stock }) {
   const [quantity, setQuantity] = useState(1);
   const [limitPrice, setLimitPrice] = useState(stock?.price || 0);
 
-  const marketPrice = stock?.price || 0;
+  const live = useLiveQuote(stock?.symbol);
+  const marketPrice = live?.price ?? stock?.price ?? 0;
 
   const executionPrice =
     orderType === "MARKET" ? marketPrice : limitPrice;

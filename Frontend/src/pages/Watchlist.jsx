@@ -1,13 +1,58 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Eye, Star, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/Layout/DashboardLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import api from "../api/axios.js";
+import { subscribeSymbols, unsubscribeSymbols, useLiveQuote } from "../lib/realtime.js";
+
+function WatchlistRow({ stock, onRemove, isRemoving }) {
+  const navigate = useNavigate();
+  const live = useLiveQuote(stock.symbol);
+
+  const price = live?.price ?? stock.price;
+  const change = live?.change ?? stock.change;
+  const isPositive = change >= 0;
+
+  return (
+    <div
+      className={`flex flex-col gap-3 rounded-2xl border border-(--border-color) bg-(--surface-2) p-4 transition sm:flex-row sm:items-center sm:justify-between ${
+        isRemoving ? "opacity-50" : ""
+      }`}
+    >
+      <div>
+        <p className="font-medium">{stock.symbol}</p>
+        <p className="text-sm text-(--text-secondary)">{stock.name}</p>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="text-right">
+          <p className="font-medium">₹{price.toLocaleString("en-IN")}</p>
+          <p className={`text-sm ${isPositive ? "text-green-400" : "text-red-400"}`}>
+            {isPositive ? "+" : ""}
+            {change}%
+          </p>
+        </div>
+        <button
+          onClick={() => navigate(`/stock/${stock.symbol}`)}
+          title="View chart"
+          className="rounded-xl border border-(--border-color) bg-(--surface-1) p-2 text-(--text-secondary) transition hover:border-green-500 hover:text-green-400"
+        >
+          <Eye size={16} />
+        </button>
+        <button
+         onClick={() => onRemove(stock.stockId)}
+          disabled={isRemoving}
+          className="rounded-xl border border-(--border-color) bg-(--surface-1) px-3 py-2 text-sm text-(--text-secondary) transition hover:border-red-400 hover:text-red-400 disabled:cursor-not-allowed"
+        >
+          {isRemoving ? "Removing…" : "Remove"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Watchlist() {
-  const navigate = useNavigate();
   const [watchlist, setWatchlist] = useState(null); // null = loading
   const [error, setError] = useState(false);
   const [removingSymbol, setRemovingSymbol] = useState(null);
@@ -40,6 +85,17 @@ export default function Watchlist() {
     fetchWatchlist();
   }, []);
 
+  const isLoading = watchlist === null;
+  const list = useMemo(() => watchlist ?? [], [watchlist]);
+
+  useEffect(() => {
+    if (list.length > 0) {
+      const symbols = list.map((s) => s.symbol);
+      subscribeSymbols(symbols);
+      return () => unsubscribeSymbols(symbols);
+    }
+  }, [list]);
+
   async function removeFromWatchlist(stockId) {
     const previous = watchlist;
     // optimistic update — remove immediately, roll back if the API call fails
@@ -55,9 +111,6 @@ export default function Watchlist() {
       setRemovingSymbol(null);
     }
   }
-
-  const isLoading = watchlist === null;
-  const list = watchlist ?? [];
 
   return (
     <DashboardLayout>
@@ -110,43 +163,14 @@ export default function Watchlist() {
               </div>
             ) : (
               list.map((stock) => {
-                const isPositive = stock.change >= 0;
                 const isRemoving = removingSymbol === stock.stockId;
                 return (
-                  <div
+                  <WatchlistRow
                     key={stock.symbol}
-                    className={`flex flex-col gap-3 rounded-2xl border border-(--border-color) bg-(--surface-2) p-4 transition sm:flex-row sm:items-center sm:justify-between ${
-                      isRemoving ? "opacity-50" : ""
-                    }`}
-                  >
-                    <div>
-                      <p className="font-medium">{stock.symbol}</p>
-                      <p className="text-sm text-(--text-secondary)">{stock.name}</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-medium">₹{stock.price.toLocaleString("en-IN")}</p>
-                        <p className={`text-sm ${isPositive ? "text-green-400" : "text-red-400"}`}>
-                          {isPositive ? "+" : ""}
-                          {stock.change}%
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => navigate(`/stock/${stock.symbol}`)}
-                        title="View chart"
-                        className="rounded-xl border border-(--border-color) bg-(--surface-1) p-2 text-(--text-secondary) transition hover:border-green-500 hover:text-green-400"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                       onClick={() => removeFromWatchlist(stock.stockId)}
-                        disabled={isRemoving}
-                        className="rounded-xl border border-(--border-color) bg-(--surface-1) px-3 py-2 text-sm text-(--text-secondary) transition hover:border-red-400 hover:text-red-400 disabled:cursor-not-allowed"
-                      >
-                        {isRemoving ? "Removing…" : "Remove"}
-                      </button>
-                    </div>
-                  </div>
+                    stock={stock}
+                    onRemove={removeFromWatchlist}
+                    isRemoving={isRemoving}
+                  />
                 );
               })
             )}

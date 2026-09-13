@@ -2,11 +2,19 @@ import {ArrowLeft,TrendingUp,TrendingDown,Star,Share2,} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axios.js"
 import { useState,useEffect } from "react";
+import { useLiveQuote } from "../../lib/realtime.js";
 
 export default function StockHeader({ stock }) {
   const navigate = useNavigate();
+  const live = useLiveQuote(stock?.symbol);
 
-  const positive = stock.change >= 0;
+  const price = live?.price ?? stock.price;
+  const change = live?.change ?? stock.change;
+  const changePercent = live?.changePercent ?? stock.changePercent;
+  const open = live?.open ?? stock.open;
+  const previousClose = live?.previousClose ?? stock.previousClose;
+
+  const positive = change >= 0;
   const isRealStock = /^[a-f\d]{24}$/i.test(stock._id || "");
 const [isWatchlisted, setIsWatchlisted] = useState(false);
   useEffect(() => {
@@ -108,7 +116,7 @@ const toggleWatchlist = async () => {
         <div>
 
           <h2 className="text-5xl font-bold text-(--text-primary)">
-            ₹{stock.price.toLocaleString("en-IN")}
+            ₹{price.toLocaleString("en-IN")}
           </h2>
 
           <div
@@ -122,7 +130,7 @@ const toggleWatchlist = async () => {
               <TrendingDown size={20} />
             )}
 
-            ₹{stock.change.toFixed(2)} ({stock.changePercent.toFixed(2)}%)
+            ₹{change.toFixed(2)} ({changePercent.toFixed(2)}%)
           </div>
 
         </div>
@@ -135,7 +143,7 @@ const toggleWatchlist = async () => {
             </p>
 
             <p className="mt-1 font-semibold">
-              ₹{stock.open}
+              ₹{open}
             </p>
           </div>
 
@@ -145,7 +153,7 @@ const toggleWatchlist = async () => {
             </p>
 
             <p className="mt-1 font-semibold">
-              ₹{stock.previousClose}
+              ₹{previousClose}
             </p>
           </div>
 

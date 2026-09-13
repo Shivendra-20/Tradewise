@@ -6,36 +6,45 @@ import {
   Clock3,
   IndianRupee,
 } from "lucide-react";
+import { useLiveQuote } from "../../lib/realtime.js";
 
 export default function StockStats({ stock }) {
+  const live = useLiveQuote(stock?.symbol);
+
   const fmt = (value) =>
     typeof value === "number" && value > 0 ? `₹${value.toLocaleString("en-IN")}` : "—";
+
+  const open = live?.open ?? stock?.open;
+  const high = live?.high ?? stock?.high;
+  const low = live?.low ?? stock?.low;
+  const previousClose = live?.previousClose ?? stock?.previousClose;
+  const volume = live?.volume ?? stock?.volume;
 
   const stats = [
     {
       title: "Open",
-      value: fmt(stock?.open),
+      value: fmt(open),
       icon: ArrowUp,
       color: "text-green-500",
       bg: "bg-green-500/10",
     },
     {
       title: "High",
-      value: fmt(stock?.high),
+      value: fmt(high),
       icon: Activity,
       color: "text-emerald-500",
       bg: "bg-emerald-500/10",
     },
     {
       title: "Low",
-      value: fmt(stock?.low),
+      value: fmt(low),
       icon: ArrowDown,
       color: "text-red-500",
       bg: "bg-red-500/10",
     },
     {
       title: "Prev Close",
-      value: fmt(stock?.previousClose),
+      value: fmt(previousClose),
       icon: Clock3,
       color: "text-blue-500",
       bg: "bg-blue-500/10",
@@ -43,8 +52,8 @@ export default function StockStats({ stock }) {
     {
       title: "Volume",
       value:
-        typeof stock?.volume === "number" && stock.volume > 0
-          ? stock.volume.toLocaleString("en-IN")
+        typeof volume === "number" && volume > 0
+          ? volume.toLocaleString("en-IN")
           : "—",
       icon: BarChart3,
       color: "text-purple-500",

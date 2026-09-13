@@ -94,7 +94,7 @@ export const getAllStocks = async (req, res) => {
           stock.previousClose = q.close ?? stock.previousClose;
         }
       } catch (error) {
-        console.error("[getAllStocks] live enrichment failed:", error.message);
+        console.error("[getAllStocks] live enrichment failed : ", error.message);
       }
     }
 

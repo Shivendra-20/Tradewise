@@ -9,7 +9,8 @@ import CompanyInfo from "../components/Stock/CompanyOverview.jsx";
 import Financials from "../components/Stock/NewsSection.jsx";
 import StockFundamentals from "../components/Stock/StockFundamentals.jsx";
 import { useEffect, useState } from "react";
-import { getStockDetails, getLiveQuote } from "../api/stock.js";
+import { getStockDetails } from "../api/stock.js";
+import { subscribeSymbols, unsubscribeSymbols } from "../lib/realtime.js";
 
 export default function Stock() {
   const { symbol } = useParams();
@@ -17,8 +18,6 @@ export default function Stock() {
   const [stock, setStock] = useState(null);
 
 useEffect(() => {
-  let intervalId;
-
   const loadStock = async () => {
     try {
       const res = await getStockDetails(symbol);
@@ -39,34 +38,12 @@ useEffect(() => {
     }
   };
 
-  const loadLiveQuote = async () => {
-    try {
-      const response = await getLiveQuote(symbol);
-      const quote = response.data.data;
-      setStock((prev) =>
-        prev
-          ? {
-              ...prev,
-              price: quote.price ?? prev.price,
-              change: quote.change ?? prev.change,
-              changePercent: quote.changePercent ?? prev.changePercent,
-              open: quote.open ?? prev.open,
-              high: quote.high ?? prev.high,
-              low: quote.low ?? prev.low,
-              volume: quote.volume ?? prev.volume,
-              previousClose: quote.previousClose ?? prev.previousClose,
-            }
-          : prev
-      );
-    } catch (error) {
-      console.error("Failed to load live quote:", error);
-    }
-  };
-
   loadStock();
-  intervalId = setInterval(loadLiveQuote, 5000);
+  subscribeSymbols([symbol]);
 
-  return () => clearInterval(intervalId);
+  return () => {
+    unsubscribeSymbols([symbol]);
+  };
 }, [symbol]);
 
  if (!stock) {

@@ -1,10 +1,38 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Wallet, RefreshCw } from "lucide-react";
 import DashboardLayout from "../components/Layout/DashboardLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import { formatCurrency, formatPercent } from "../lib/formatters.js";
-import api from "../api/axios.js"; // your configured axios instance with JWT interceptor
+import api from "../api/axios.js";
+import { subscribeSymbols, unsubscribeSymbols, useLiveQuote } from "../lib/realtime.js";
+
+function HoldingsRow({ holding }) {
+  const live = useLiveQuote(holding.stockId?.symbol);
+
+  const ltp = live?.price ?? holding.stockId?.currentPrice ?? 0;
+  const avgCost = holding.avgBuyPrice ?? 0;
+  const qty = holding.quantity ?? 0;
+  const pl = (ltp - avgCost) * qty;
+  const plPercent = avgCost > 0 ? ((ltp - avgCost) / avgCost) * 100 : 0;
+
+  return (
+    <tr className="border-t border-(--border-color)">
+      <td className="py-4 font-medium">{holding.stockId?.symbol}</td>
+      <td className="py-4">{holding.quantity}</td>
+      <td className="py-4">{formatCurrency(holding.avgBuyPrice)}</td>
+      <td className="py-4">{formatCurrency(ltp)}</td>
+      <td
+        className={`py-4 font-semibold ${
+          pl >= 0 ? "text-green-400" : "text-red-400"
+        }`}
+      >
+        {pl >= 0 ? "+" : ""}
+        {formatCurrency(pl)} ({formatPercent(plPercent)})
+      </td>
+    </tr>
+  );
+}
 
 export default function Portfolio() {
   // 1. States updated with summary state
@@ -37,8 +65,15 @@ export default function Portfolio() {
   }, []);
 
   const isLoading = rawHoldings === null;
-  // 4. Fallback intact
-  const holdings = rawHoldings ?? [];
+  const holdings = useMemo(() => rawHoldings ?? [], [rawHoldings]);
+
+  useEffect(() => {
+    if (holdings.length > 0) {
+      const symbols = holdings.map((h) => h.stockId?.symbol).filter(Boolean);
+      subscribeSymbols(symbols);
+      return () => unsubscribeSymbols(symbols);
+    }
+  }, [holdings]);
 
   return (
     <DashboardLayout>
@@ -148,20 +183,10 @@ export default function Portfolio() {
                         </tr>
                       ))
                     : holdings.map((holding) => (
-                        <tr key={holding.stockId?.symbol} className="border-t border-(--border-color)">
-                          <td className="py-4 font-medium">{holding.stockId?.symbol}</td>
-                          <td className="py-4">{holding.quantity}</td>
-                          <td className="py-4">{formatCurrency(holding.avgBuyPrice)}</td>
-                          <td className="py-4">{formatCurrency(holding.stockId?.currentPrice)}</td>
-                          <td
-                            className={`py-4 font-semibold ${
-                              holding.unrealizedPL >= 0 ? "text-green-400" : "text-red-400"
-                            }`}
-                          >
-                            {holding.unrealizedPL >= 0 ? "+" : ""}
-                            {formatCurrency(holding.unrealizedPL)} ({formatPercent(holding.unrealizedPLPercent)})
-                          </td>
-                        </tr>
+                        <HoldingsRow
+                          key={holding.stockId?.symbol}
+                          holding={holding}
+                        />
                       ))}
                 </tbody>
               </table>
