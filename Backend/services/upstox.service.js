@@ -19,7 +19,7 @@ const apiHeaders = () => ({
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // fetchWithRetry(url, options) — Kisi bhi URL ko call karta hai,
-//  agar fail ho (5xx/408/429) to 3 baar tak retry karta hai backoff ke saath (700ms, 1400ms...). 
+// agar fail ho (5xx/408/429) to 3 baar tak retry karta hai backoff ke saath (700ms, 1400ms...). 
 // 4xx errors (jaise 404) pe retry nahi karta — kyunki wo dobara try karne se sahi nahi hoga.
 export const fetchWithRetry = async (url, { attempts = 3, backoffMs = 700, ...opts } = {}) => {
   let lastError;
@@ -101,6 +101,9 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
 //  predictable shape mein convert karta hai 
 // — taaki poore app mein hamesha same format mile (price, change, volume, etc consistent naam se)
 const normalizeQuote = (payload, instrumentKey) => {
+// payload?.last_price — Optional chaining (?.) Sirf "agar payload exists ho to .last_price lo, warna undefined". Bloody crash from null.
+// 2. a ?? b — Nullish coalescing (??) "Agar a null/undefined hai to b use karo."
+
   const price = num(payload?.last_price ?? payload?.ltp ?? payload?.price);
   const close = num(payload?.close_price ?? payload?.cp ?? payload?.close);
   return {

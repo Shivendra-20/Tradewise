@@ -1,17 +1,20 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import zlib from "zlib";
+import fs from "fs";  //Files/folders ko read, write, create karne ke liye.
+import path from "path";  //File/folder ke paths safely banane ke liye.
+import { fileURLToPath } from "url"; // ES Module (import) mein current file ka actual filesystem path nikalne ke liye.
+import zlib from "zlib";  // .gz compressed file ko decompress/unzip karne ke liye.
 
+//import.meta.url → current JS file ka URL deta hai.
+// fileURLToPath() → us URL ko normal file path mein convert karta hai.
+// path.dirname() → us file ka folder path deta hai.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const EXCHANGE_FILE_URL = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
 const CACHE_DIR = path.join(__dirname, "..", ".upstox-cache");
 const CACHE_FILE = path.join(CACHE_DIR, "instruments.json");
 
-let instruments = [];
-let loaded = false;
-let loadPromise = null;
+let instruments = [];  // Stores the entire instrument list in memory.
+let loaded = false;     // Have we already loaded the instruments into memory?
+let loadPromise = null;  // This is used to prevent multiple simultaneous downloads.
 
 //loadFromCache() — Disk pe pehle se saved .upstox-cache/instruments.json file check karta hai. 
 // Mil gaya to memory mein load kar leta hai (fresh download avoid karne ke liye).
@@ -44,7 +47,7 @@ async function downloadInstruments() {
 }
 
 //getInstruments(force) — Ye main entry point hai: pehle cache try karta hai, nahi mila to download karta hai. 
-// oadPromise — agar ek saath multiple calls aa jaayein (server start hote hi), sabko ek hi download/load milega, 
+// loadPromise — agar ek saath multiple calls aa jaayein (server start hote hi), sabko ek hi download/load milega, 
 // duplicate download nahi hoga.
 export const getInstruments = async (force = false) => {
   if (loaded && !force) return instruments;
@@ -135,7 +138,6 @@ export const getInstrumentDetails = async (symbol) => {
     sector: match.segment,
   };
 };
-
 
 //getSymbolFromKey(instrumentKey) — Reverse lookup: key se wapas symbol nikalta hai 
 // (jab WebSocket se tick aaye with key, symbol pata karne ke liye).

@@ -113,7 +113,7 @@ message MarketInfo {
 }
 
 message FeedResponse{
-  Type type = 1;
+  Type type = 1;  
   map<string, Feed> feeds = 2;
   int64 currentTs = 3;
   MarketInfo marketInfo = 4;

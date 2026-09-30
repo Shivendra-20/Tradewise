@@ -196,11 +196,13 @@ CLIENT_URL=http://localhost:5173
 NODE_ENV=development
 
 # Upstox (optional — the app falls back to Yahoo Finance automatically)
+UPSTOX_API_KEY=                 # Developer Dashboard se
+UPSTOX_API_SECRET=              # Developer Dashboard se
 UPSTOX_ACCESS_TOKEN=            # Analytics token (valid ~1 year)
+UPSTOX_REDIRECT_URI=            # OAuth redirect (e.g. http://localhost:5000/auth/upstox/callback)
 UPSTOX_REFRESH_TOKEN=           # optional OAuth auto-refresh
-UPSTOX_CLIENT_ID=
-UPSTOX_CLIENT_SECRET=
-UPSTOX_REDIRECT_URI=
+UPSTOX_CLIENT_ID=               # optional OAuth auto-refresh
+UPSTOX_CLIENT_SECRET=           # optional OAuth auto-refresh
 UPSTOX_API_BASE_URL=https://api.upstox.com
 ```
 
