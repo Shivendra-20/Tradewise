@@ -1,7 +1,7 @@
 import Stock from "../models/Stock.js";
 import StockHistory from "../models/StockHistory.js";
 import { fetchUpstoxQuote, fetchUpstoxHistory, fetchUpstoxBatchQuotes } from "../services/upstox.service.js";
-import { fetchYahooHistory, fetchYahooMeta, fetchYahooFundamentals } from "../services/yahoo.service.js";
+import { fetchYahooFundamentals } from "../services/yahoo.service.js";
 import { getInstrumentDetails } from "../services/upstoxInstruments.js";
 
 // Stock controllers
@@ -135,37 +135,20 @@ export const getIndicesQuotes = async (req, res) => {
 
     const settled = await Promise.allSettled(
       INDICES.map(async (idx) => {
-        let quote = null;
-
         try {
           const upstox = await fetchUpstoxQuote(idx.symbol);
-          if (upstox?.price) {
-            quote = {
-              price: upstox.price,
-              change: upstox.change ?? 0,
-              changePercent: upstox.changePercent ?? 0,
-              source: "upstox",
-            };
-          }
+          if (!upstox?.price) return null;
+          return {
+            symbol: idx.symbol,
+            label: idx.label,
+            price: upstox.price,
+            change: upstox.change ?? 0,
+            changePercent: upstox.changePercent ?? 0,
+            source: "upstox",
+          };
         } catch {
-          // Upstox blocked/unreachable — fall through to Yahoo below.
+          return null;
         }
-
-        if (!quote) {
-          const meta = await fetchYahooMeta({ symbol: idx.symbol });
-          if (meta?.price) {
-            quote = {
-              price: meta.price,
-              change: meta.change ?? 0,
-              changePercent: meta.changePercent ?? 0,
-              previousClose: meta.previousClose ?? null,
-              source: "yahoo",
-            };
-          }
-        }
-
-        if (!quote) return null;
-        return { symbol: idx.symbol, label: idx.label, ...quote };
       })
     );
 
@@ -226,11 +209,7 @@ export const searchStocks = async (req, res) => {
   }
 };
 
-// Per-symbol Yahoo quote cache (real-time enrichment for stock pages).
-const yahooDetailCache = new Map();
-const YAHOO_CACHE_TTL_MS = 120000;
-
-// Fundamentals change slowly, so cache them much longer than the quote meta.
+// Fundamentals change slowly, so cache them for 6 hours.
 const yahooFundamentalsCache = new Map();
 const YAHOO_FUND_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -280,59 +259,6 @@ export const getStockBySymbol = async (req, res) => {
 
       await Stock.updateOne({ symbol: doc.symbol }, { $set: doc }, { upsert: true });
       stock = { ...doc, _id: "pending" };
-    }
-
-    // Enrich with a real per-symbol quote snapshot (Yahoo fallback when Upstox
-    // is blocked). Cached so frequent page views don't hammer the API.
-    try {
-      const cached = yahooDetailCache.get(symbol);
-      let meta = cached && Date.now() - cached.at < YAHOO_CACHE_TTL_MS ? cached.meta : null;
-
-      if (!meta) {
-        const fresh = await fetchYahooMeta({ symbol });
-        if (fresh?.price) {
-          meta = fresh;
-          yahooDetailCache.set(symbol, { meta: fresh, at: Date.now() });
-        }
-      }
-
-      if (meta?.price) {
-        stock = {
-          ...stock,
-          name: meta.name || stock.name,
-          currentPrice: meta.price,
-          previousClose: meta.previousClose ?? stock.previousClose,
-          change: meta.change ?? stock.change,
-          changePercent: meta.changePercent ?? stock.changePercent,
-          dayHigh: meta.dayHigh ?? stock.dayHigh,
-          dayLow: meta.dayLow ?? stock.dayLow,
-          volume: meta.volume ?? stock.volume,
-          weekHigh52: meta.weekHigh52 ?? stock.weekHigh52,
-          weekLow52: meta.weekLow52 ?? stock.weekLow52,
-        };
-
-        if (stock._id && stock._id !== "pending") {
-          Stock.updateOne(
-            { symbol },
-            {
-              $set: {
-                name: meta.name,
-                currentPrice: meta.price,
-                previousClose: meta.previousClose,
-                change: meta.change,
-                changePercent: meta.changePercent,
-                dayHigh: meta.dayHigh,
-                dayLow: meta.dayLow,
-                volume: meta.volume,
-                weekHigh52: meta.weekHigh52,
-                weekLow52: meta.weekLow52,
-              },
-            }
-          ).catch(() => {});
-        }
-      }
-    } catch (error) {
-      console.error("[getStockBySymbol] yahoo enrichment failed for", symbol, error.message);
     }
 
     // Enrich with fundamental metrics (market cap, P/E, EPS, ...) from Yahoo's
@@ -409,26 +335,12 @@ export const getStockHistory = async (req, res) => {
       req.query.from ||
       new Date(Date.now() - config.days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    // Prefer Upstox candles; fall back to Yahoo when Upstox is blocked/unreachable.
-    let history;
-    let source = "upstox";
-    try {
-      history = await fetchUpstoxHistory({
-        symbol,
-        interval: config.interval,
-        fromDate,
-        toDate,
-      });
-    } catch (upstoxErr) {
-      console.warn("[getStockHistory] Upstox failed, trying Yahoo:", upstoxErr.message);
-      try {
-        history = await fetchYahooHistory({ symbol, interval: config.interval });
-        source = "yahoo";
-      } catch (yahooErr) {
-        console.warn("[getStockHistory] Yahoo fallback failed:", yahooErr.message);
-        throw new Error(`History unavailable from all sources: ${yahooErr.message}`);
-      }
-    }
+    const history = await fetchUpstoxHistory({
+      symbol,
+      interval: config.interval,
+      fromDate,
+      toDate,
+    });
 
     // Cache the freshly fetched candles so charts keep working after market
     // close and during transient network blocks of the Upstox REST API.
@@ -452,7 +364,7 @@ export const getStockHistory = async (req, res) => {
       }
     }
 
-    return res.status(200).json({ success: true, data: history, cached: false, source });
+    return res.status(200).json({ success: true, data: history, cached: false, source: "upstox" });
   } catch (error) {
     console.error("[getStockHistory]", error);
 

@@ -11,7 +11,6 @@ import {
   INDEX_KEYS,
   normalizeSymbol,
 } from "./upstoxInstruments.js";
-import { fetchYahooMeta } from "./yahoo.service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROTO_FILE = path.join(__dirname, "MarketDataFeedV3.proto");
@@ -22,8 +21,6 @@ const UPSTOX_BASE_URL =
 const FEED_AUTHORIZE_PATH = "/v3/feed/market-data-feed/authorize";
 
 const DB_SYNC_INTERVAL_MS = 15000;
-const YAHOO_POLL_INTERVAL_MS = 15000;
-const YAHOO_BATCH_SIZE = 5;
 
 // ---------------------------------------------------------------------------
 // State
@@ -42,8 +39,6 @@ const state = {
   lastDbSync: new Map(),
   lastTickLog: 0,
   FeedResponse: null,
-  yahooPollTimer: null,
-  yahooPollRunning: false,
 };
 
 // Curated liquid NSE names — subscribed so the dashboard/market page is always live.
@@ -189,84 +184,6 @@ async function syncStockToDb(tick, symbol) {
 }
 
 // ---------------------------------------------------------------------------
-// Yahoo Finance fallback polling (when Upstox is unreachable)
-// ---------------------------------------------------------------------------
-
-//yahooPollTick() — Har 15 sec mein Yahoo se quotes polls karta hai (5-5 symbols ke batch mein),
-//  phir sabko market:tick event se emit karta hai
-async function yahooPollTick() {
-  if (state.yahooPollRunning || state.connected || !state.io) return;
-  state.yahooPollRunning = true;
-
-  try {
-    const symbols = Array.from(state.keyToSymbol.values());
-    if (symbols.length === 0) return;
-
-    const ticks = [];
-
-    for (let i = 0; i < symbols.length; i += YAHOO_BATCH_SIZE) {
-      const batch = symbols.slice(i, i + YAHOO_BATCH_SIZE);
-      const results = await Promise.allSettled(batch.map((sym) => fetchYahooMeta({ symbol: sym })));
-
-      for (const result of results) {
-        if (result.status !== "fulfilled" || !result.value?.price) continue;
-        const m = result.value;
-
-        const tick = {
-          symbol: m.symbol,
-          price: m.price,
-          change: m.change ?? 0,
-          changePercent: m.changePercent ?? 0,
-          open: null,
-          high: m.dayHigh ?? null,
-          low: m.dayLow ?? null,
-          close: m.previousClose ?? null,
-          volume: m.volume ?? null,
-          timestamp: Date.now(),
-        };
-
-        state.latestQuotes.set(m.symbol, tick);
-        ticks.push(tick);
-        syncStockToDb(tick, m.symbol);
-      }
-
-      if (i + YAHOO_BATCH_SIZE < symbols.length) {
-        await new Promise((r) => setTimeout(r, 300));
-      }
-    }
-
-    if (ticks.length > 0) {
-      state.io.emit("market:tick", { ticks });
-
-      const now = Date.now();
-      if (now - state.lastTickLog > 30000) {
-        state.lastTickLog = now;
-        console.log(`[marketDataFeed] Yahoo fallback: emitted ${ticks.length} ticks`);
-      }
-    }
-  } catch (error) {
-    console.error("[marketDataFeed] Yahoo poll error:", error.message);
-  } finally {
-    state.yahooPollRunning = false;
-  }
-}
-
-//startYahooFallback() / stopYahooFallback() — Polling interval start/stop karte hain
-function startYahooFallback() {
-  if (state.yahooPollTimer) return;
-  console.log("[marketDataFeed] Upstox unavailable — starting Yahoo Finance fallback polling");
-  state.yahooPollTimer = setInterval(yahooPollTick, YAHOO_POLL_INTERVAL_MS);
-  yahooPollTick();
-}
-
-function stopYahooFallback() {
-  if (!state.yahooPollTimer) return;
-  clearInterval(state.yahooPollTimer);
-  state.yahooPollTimer = null;
-  console.log("[marketDataFeed] Upstox reconnected — stopping Yahoo fallback");
-}
-
-// ---------------------------------------------------------------------------
 // Feed connection
 // ---------------------------------------------------------------------------
 
@@ -325,7 +242,6 @@ async function connect() {
       console.log("[marketDataFeed] Connected to Upstox market feed");
       state.connected = true;
       state.retryCount = 0;
-      stopYahooFallback();
       sendSubscriptions();
     });
 
@@ -371,7 +287,6 @@ async function connect() {
       state.connected = false;
       state.ws = null;
       console.log("[marketDataFeed] Connection closed, reconnecting...");
-      startYahooFallback();
       scheduleReconnect();
     });
 
@@ -385,7 +300,6 @@ async function connect() {
     state.ws = ws;
   } catch (error) {
     console.error("[marketDataFeed] Connection failed:", error.message);
-    startYahooFallback();
     scheduleReconnect();
   }
 }
