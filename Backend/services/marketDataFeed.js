@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import protobuf from "protobufjs";
+import protobuf from "protobufjs";// Data ko ek compact binary format mein convert karta hai, taaki network par efficiently send/receive kiya ja sake.
 import axios from "axios";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -16,8 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROTO_FILE = path.join(__dirname, "MarketDataFeedV3.proto");
 const FEED_RESPONSE_TYPE = "com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse";
 
-const UPSTOX_BASE_URL =
-  process.env.UPSTOX_API_BASE_URL?.replace(/\/+$/, "") || "https://api.upstox.com";
+const UPSTOX_BASE_URL = process.env.UPSTOX_API_BASE_URL?.replace(/\/+$/, "") || "https://api.upstox.com";
 const FEED_AUTHORIZE_PATH = "/v3/feed/market-data-feed/authorize";
 
 const DB_SYNC_INTERVAL_MS = 15000;
@@ -33,7 +32,7 @@ const state = {
   retryTimer: null,
   retryCount: 0,
   shouldRun: false,
-  subscribedKeys: new Set(),
+  subscribedKeys: new Set(), // jin instruments(stocks) ka live data hum maang rahe hain
   keyToSymbol: new Map(),
   latestQuotes: new Map(),
   lastDbSync: new Map(),
@@ -108,24 +107,46 @@ async function resolveSymbolFromKey(instrumentKey) {
 //extractTicks(payload) — Decoded protobuf se actual price/OHLC data nikalta hai. 
 // Upstox ka format nested hai (fullFeed.marketFF ya indexFF ya ltpc), 
 // ye unwrap karke ek simple tick object banata hai
+// FeedResponse (proto line 115-120) → payload ka shape
+/* payload ka structure h yeh
+{
+  type: "live_feed",
+  feeds: {                                  // map: instrumentKey → Feed
+    "NSE_EQ|INE002A01018": {               // RELIANCE ka key
+      fullFeed: {
+        marketFF: {                         // stocks ke liye branch
+          ltpc: { ltp: 2900, ltt: 1700000, cp: 2850 },
+          marketOHLC: { ohlc: [{ open: 2870, high: 2950, low: 2860, close: 2900 }] },
+          vtt: 500000,                      // volume today
+        },
+      },
+      requestMode: "full_d5",
+    },
+    "NSE_INDEX|Nifty 50": {                // index ka feed (different branch!)
+      fullFeed: { indexFF: { ltpc: {...} } },
+    },
+  },
+  currentTs: 1700000000,
+}
+*/
 function extractTicks(payload) {
   const ticks = [];
   const feeds = payload?.feeds || {};
 
   for (const instrumentKey of Object.keys(feeds)) {
+
     const feed = feeds[instrumentKey];
     if (!feed) continue;
 
     // v3: Feed.oneof -> ltpc | fullFeed(marketFF|indexFF) | firstLevelWithGreeks
-    const data =
-      feed.fullFeed?.marketFF || feed.fullFeed?.indexFF || feed.firstLevelWithGreeks || feed.ltpc;
+    const data = feed.fullFeed?.marketFF || feed.fullFeed?.indexFF || feed.firstLevelWithGreeks || feed.ltpc;
     if (!data) continue;
 
     const ltpc = data.ltpc || data;
     const ohlc = data.marketOHLC?.ohlc?.[0] || {};
 
     const price = ltpc.ltp;
-    const close = ltpc.cp ?? data.cp ?? data.lastClose;
+    const close = ltpc.cp ?? data.cp ?? data.lastClose; 
     if (price == null) continue;
 
     const change = price - close;
@@ -153,7 +174,7 @@ function extractTicks(payload) {
 // DB sync (throttled) — keeps Stock.currentPrice fresh for order execution
 // ---------------------------------------------------------------------------
 
-//syncStockToDb(tick, symbol) — Stock document ka price update karta hai MongoDB mein 
+//ksyncStockToDb(tic, symbol) — Stock document ka price update karta hai MongoDB mein 
 // — throttled (15 sec mein ek baar per symbol), taaki har tick pe DB na hit ho
 async function syncStockToDb(tick, symbol) {
   const now = Date.now();
@@ -202,19 +223,19 @@ function sendSubscriptions() {
   );
 }
 
-function sendUnsubscriptions(keys) {
-  if (!state.ws || state.ws.readyState !== WebSocket.OPEN || keys.length === 0) return;
+  function sendUnsubscriptions(keys) {
+    if (!state.ws || state.ws.readyState !== WebSocket.OPEN || keys.length === 0) return;
 
-  state.ws.send(
-    Buffer.from(
-      JSON.stringify({
-        guid: `unsub-${Date.now()}`,
-        method: "unsub",
-        data: { instrumentKeys: keys },
-      })
-    )
-  );
-}
+    state.ws.send(
+      Buffer.from(
+        JSON.stringify({
+          guid: `unsub-${Date.now()}`,
+          method: "unsub",
+          data: { instrumentKeys: keys },
+        })
+      )
+    );
+  }
 
 //connect() — Sabse important: token leke Upstox se auth karta hai,
 //  WebSocket connect karta hai, aur open/message/close/error events handle karta hai
@@ -258,8 +279,7 @@ async function connect() {
         const normalizedTicks = [];
 
         for (const tick of ticks) {
-          const symbol =
-            state.keyToSymbol.get(tick.instrumentKey) || (await resolveSymbolFromKey(tick.instrumentKey));
+          const symbol = state.keyToSymbol.get(tick.instrumentKey) || (await resolveSymbolFromKey(tick.instrumentKey));
           if (!symbol) continue;
 
           const normalized = { ...tick, symbol };
