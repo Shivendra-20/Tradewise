@@ -78,7 +78,11 @@ io.use((socket, next) => {
   }
 
   try {
-    jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Private room — limit order fill sirf usi user ko bhejo
+    socket.data.userId = payload.userId;
+    socket.join(`user:${payload.userId}`);
     return next();
   } catch {
     return next(new Error("Unauthorized"));

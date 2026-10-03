@@ -1,22 +1,14 @@
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Stock from "../models/Stock.js";
-import Portfolio from "../models/Portfolio.js";
-import Transaction from "../models/Transaction.js";
-import User from "../models/User.js";
+import { executeFill } from "../services/orderExecution.js";
+import { subscribe } from "../services/marketDataFeed.js";
 
 const getUserId = (req) => req.user._id;
 
-// fix #8 — session bhi end karo abort ke saath
-const abortAndRespond = async (session, res, status, message) => {
-  await session.abortTransaction();
-  session.endSession();
-  return res.status(status).json({ success: false, message });
-};
-
 // Allowed values for filter sanitization
 const VALID_ORDER_TYPES   = ["buy", "sell"];
-const VALID_ORDER_STATUSES = ["pending", "completed", "cancelled"];
+const VALID_ORDER_STATUSES = ["pending", "completed", "cancelled", "failed"];
 const VALID_EXECUTION_TYPES = ["market", "limit"];
 
 export const placeOrder = async (req, res) => {
@@ -49,159 +41,64 @@ export const placeOrder = async (req, res) => {
     return res.status(400).json({ success: false, message: "price is required for limit orders" });
   }
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const userId = getUserId(req);
 
-  try {
-    const userId = getUserId(req);
+  const stock = await Stock.findOne({ _id: stockId, isActive: true }).lean();
+  if (!stock) {
+    return res.status(404).json({ success: false, message: "Stock not found" });
+  }
 
-    const stock = await Stock.findOne({ _id: stockId, isActive: true }).session(session);
-    if (!stock) {
-      return abortAndRespond(session, res, 404, "Stock not found");
-    }
-
-    if (orderType === "limit") {
-      const order = new Order({
-        userId,
-        stockId,
-        type,
-        orderType: "limit",
-        status: "pending",
-        quantity: qty,
-        price,
-      });
-      await order.save({ session });
-      await session.commitTransaction();
-      session.endSession();
-
-      return res.status(201).json({
-        success: true,
-        message: "Limit order placed successfully",
-        data: { order },
-      });
-    }
-
-    // Market order execution
-    const executionPrice = stock.currentPrice;
-    const totalCost = parseFloat((qty * executionPrice).toFixed(2));
-
-    const user = await User.findById(userId).session(session);
-    if (!user) {
-      return abortAndRespond(session, res, 404, "User not found");
-    }
-
-    const balanceBefore = user.virtualBalance;
-    let balanceAfter;
-    let profitLoss = null;
-
-    if (type === "buy") {
-      if (user.virtualBalance < totalCost) {
-        return abortAndRespond(
-          session, res, 400,
-          `Insufficient balance. Required: ₹${totalCost}, Available: ₹${user.virtualBalance}`
-        );
-      }
-
-      user.virtualBalance = parseFloat((user.virtualBalance - totalCost).toFixed(2));
-      balanceAfter = user.virtualBalance;
-      await user.save({ session });
-
-      const existing = await Portfolio.findOne({ userId, stockId }).session(session);
-
-      if (existing) {
-        const newQty   = existing.quantity + qty;
-        const newAvg   = parseFloat(
-          ((existing.quantity * existing.avgBuyPrice + qty * executionPrice) / newQty).toFixed(2)
-        );
-        existing.quantity      = newQty;
-        existing.avgBuyPrice   = newAvg;
-        existing.totalInvested = parseFloat((newQty * newAvg).toFixed(2)); // fix #1
-        await existing.save({ session });
-      } else {
-        await new Portfolio({
-          userId,
-          stockId,
-          quantity: qty,
-          avgBuyPrice: executionPrice,
-          totalInvested: totalCost, // fix #1
-        }).save({ session });
-      }
-    }
-
-    if (type === "sell") {
-      const holding = await Portfolio.findOne({ userId, stockId }).session(session);
-
-      if (!holding || holding.quantity < qty) {
-        return abortAndRespond(
-          session, res, 400,
-          `Not enough shares. You hold ${holding?.quantity || 0}, trying to sell ${qty}`
-        );
-      }
-
-      profitLoss = parseFloat(((executionPrice - holding.avgBuyPrice) * qty).toFixed(2));
-
-      user.virtualBalance = parseFloat((user.virtualBalance + totalCost).toFixed(2));
-      balanceAfter = user.virtualBalance;
-      await user.save({ session });
-
-      holding.quantity -= qty;
-
-      if (holding.quantity === 0) {
-        await holding.deleteOne({ session });
-      } else {
-        // fix #1 — totalInvested bhi update karo on partial sell
-        holding.totalInvested = parseFloat((holding.quantity * holding.avgBuyPrice).toFixed(2));
-        await holding.save({ session });
-      }
-    }
-
-    const order = new Order({
-      userId, stockId, type,
-      orderType: "market",
-      status: "completed",
+  if (orderType === "limit") {
+    const order = await new Order({
+      userId,
+      stockId,
+      type,
+      orderType: "limit",
+      status: "pending",
       quantity: qty,
-      price: executionPrice,
-      executedAt: new Date(),
+      price,
+    }).save();
+
+    // Limit order ke liye live ticks chahiye — warna price kabhi check hi nahi hoga.
+    subscribe(stock.symbol);
+
+    return res.status(201).json({
+      success: true,
+      message: "Limit order placed. It will execute automatically when target price is reached.",
+      data: { order },
     });
-    await order.save({ session });
+  }
 
-    await new Transaction({
-      userId, stockId,
-      orderId: order._id,
-      action: type,
-      quantity: qty,
-      price: executionPrice,
+  // Market order — turant current price pe execute
+  try {
+    const result = await executeFill({
+      userId,
+      stockId,
       stockSymbol: stock.symbol,
-      balanceBefore,
-      balanceAfter,
-      profitLoss,
-    }).save({ session });
-
-    await session.commitTransaction();
-    session.endSession();
+      type,
+      quantity: qty,
+      price: stock.currentPrice,
+    });
 
     return res.status(201).json({
       success: true,
       message: `${type.toUpperCase()} order executed successfully`,
       data: {
         order: {
-          _id: order._id,
-          type: order.type,
-          orderType: order.orderType,
-          quantity: order.quantity,
-          price: order.price,
-          status: order.status,
+          _id: result.orderId,
+          type,
+          orderType: "market",
+          quantity: qty,
+          price: stock.currentPrice,
+          status: "completed",
         },
-        balanceBefore,
-        balanceAfter,
-        profitLoss,
+        balanceBefore: result.balanceBefore,
+        balanceAfter: result.balanceAfter,
+        profitLoss: result.profitLoss,
       },
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error("[placeOrder]", { message: error.message, userId: req.user?._id });
-    return res.status(500).json({ success: false, message: "Order failed. Please try again." });
+    return res.status(400).json({ success: false, message: error.message });
   }
 };
 
@@ -258,35 +155,27 @@ export const getOrderById = async (req, res) => {
 };
 
 export const cancelOrder = async (req, res) => {
-  // fix #6 — session ready for future balance refund logic
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return abortAndRespond(session, res, 400, "Invalid order ID");
+      return res.status(400).json({ success: false, message: "Invalid order ID" });
     }
 
     const order = await Order.findOne({
       _id: req.params.id,
       userId: getUserId(req),
-    }).session(session);
+    });
 
     if (!order) {
-      return abortAndRespond(session, res, 404, "Order not found");
+      return res.status(404).json({ success: false, message: "Order not found" });
     }
 
     if (order.status !== "pending") {
-      return abortAndRespond(session, res, 400, `Cannot cancel a ${order.status} order`);
+      return res.status(400).json({ success: false, message: `Cannot cancel a ${order.status} order` });
     }
 
+    // Note: limit order pe balance reserve nahi hota, isliye cancel karne pe koi refund nahi karna.
     order.status = "cancelled";
-    await order.save({ session });
-
-    // TODO: if limit order, refund reserved balance here inside same session
-
-    await session.commitTransaction();
-    session.endSession();
+    await order.save();
 
     return res.status(200).json({
       success: true,
@@ -294,8 +183,6 @@ export const cancelOrder = async (req, res) => {
       data: order,
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     console.error("[cancelOrder]", error);
     return res.status(500).json({ success: false, message: "Failed to cancel order" });
   }

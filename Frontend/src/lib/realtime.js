@@ -9,6 +9,7 @@ let connectAttempted = false;
 const quoteStore = new Map();
 const listeners = new Set();
 const requestedSymbols = new Set();
+const orderListeners = new Set();
 
 function notify() {
   listeners.forEach((cb) => cb());
@@ -58,6 +59,12 @@ export function getSocket() {
     if (changed) notify();
   });
 
+  socket.on("order:filled", (payload) => {
+    // Limit order auto-execute hua → Orders/Portfolio page refresh karein
+    if (!payload?.symbol) return;
+    orderListeners.forEach((cb) => cb(payload));
+  });
+
   socket.on("connect_error", (err) => {
     if (err?.message === "Unauthorized") {
       socket?.disconnect();
@@ -75,6 +82,13 @@ export function subscribeToQuotes(cb) {
   getSocket();
   listeners.add(cb);
   return () => listeners.delete(cb);
+}
+
+// onOrderFilled(cb) — jab bhi koi limit order auto-execute ho, callback fire hota hai
+export function onOrderFilled(cb) {
+  getSocket();
+  orderListeners.add(cb);
+  return () => orderListeners.delete(cb);
 }
 
 export function getLiveQuote(symbol) {

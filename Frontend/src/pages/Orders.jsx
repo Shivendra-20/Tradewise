@@ -4,6 +4,7 @@ import DashboardLayout from "../components/Layout/DashboardLayout.jsx";
 import Card from "../components/common/Card.jsx";
 import { formatCurrency } from "../lib/formatters.js";
 import api from "../api/axios.js"; // Adjust the path as per your project structure
+import { onOrderFilled } from "../lib/realtime.js";
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -31,6 +32,16 @@ export default function Orders() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount
     fetchOrders();
+  }, []);
+
+  // Limit order auto-execute hone pe list turant refresh
+  useEffect(() => {
+    return onOrderFilled((fill) => {
+      alert(
+        `Limit order filled!\n${fill.type.toUpperCase()} ${fill.quantity} × ${fill.symbol} @ ₹${fill.price}`
+      );
+      fetchOrders();
+    });
   }, []);
 
   // 3. Cancel Order Handler

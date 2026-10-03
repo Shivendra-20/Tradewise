@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Stock from "../models/Stock.js";
 import { getAccessToken } from "./upstox.service.js";
+import { checkLimitOrders } from "./limitOrderEngine.js";
 import {
   getInstrumentKey,
   getSymbolFromKey,
@@ -223,7 +224,7 @@ function sendSubscriptions() {
   );
 }
 
-  function sendUnsubscriptions(keys) {
+function sendUnsubscriptions(keys) {
     if (!state.ws || state.ws.readyState !== WebSocket.OPEN || keys.length === 0) return;
 
     state.ws.send(
@@ -286,6 +287,9 @@ async function connect() {
           state.latestQuotes.set(symbol, normalized);
           normalizedTicks.push(normalized);
           syncStockToDb(normalized, symbol);
+
+          // Har tick pe pending limit orders check karo — target hit hua to auto-execute
+          checkLimitOrders(symbol, normalized.price, state.io);
         }
 
         if (state.io && normalizedTicks.length > 0) {
